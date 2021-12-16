@@ -67,5 +67,5 @@ setup(
     keywords=("dummynet", "network", "namespace"),
     packages=find_packages(where="src", exclude=["test"]),
     package_dir={"": "src"},
-    install_requires=["docker"]
+    install_requires=["docker"],
 )
