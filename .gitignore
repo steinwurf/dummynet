@@ -1,0 +1,7 @@
+build
+build_current
+dist
+coverage
+.waf*
+.lock*
+.pytest_cache

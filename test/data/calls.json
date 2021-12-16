@@ -1,0 +1,98 @@
+[
+  {
+    "cmd": "ip netns list",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns add demo0",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns add demo1",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns list",
+    "cwd": null
+  },
+  {
+    "cmd": "ip link add demo0-eth type veth peer name demo1-eth",
+    "cwd": null
+  },
+  {
+    "cmd": "ip link set demo0-eth netns demo0",
+    "cwd": null
+  },
+  {
+    "cmd": "ip link set demo1-eth netns demo1",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns exec demo0 ip addr add 10.0.0.1/24 dev demo0-eth",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns exec demo1 ip addr add 10.0.0.2/24 dev demo1-eth",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns exec demo0 ip link set dev demo0-eth up",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns exec demo1 ip link set dev demo1-eth up",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns exec demo0 tc qdisc show dev demo0-eth",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns exec demo0 tc qdisc add dev demo0-eth root netem delay 20ms loss 1% rate 10Mbit limit 100",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns exec demo1 tc qdisc show dev demo1-eth",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns exec demo1 tc qdisc add dev demo1-eth root netem delay 20ms loss 1% rate 10Mbit limit 100",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns exec demo0 tc qdisc show dev demo0-eth",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns exec demo1 tc qdisc show dev demo1-eth",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns exec demo0 ip route add default via 10.0.0.1",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns exec demo1 ip route add default via 10.0.0.2",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns exec demo0 iptables -t nat -A POSTROUTING -s 10.0.0.1 -o demo0-eth -j MASQUERADE",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns exec demo1 iptables -t nat -A POSTROUTING -s 10.0.0.2 -o demo1-eth -j MASQUERADE",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns exec demo0 ip link delete demo0-eth",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns delete demo0",
+    "cwd": null
+  },
+  {
+    "cmd": "ip netns delete demo1",
+    "cwd": null
+  }
+]
