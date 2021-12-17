@@ -5,7 +5,7 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Patch: Fix `DockerShell.run_async`.
 
 1.0.0
 -----

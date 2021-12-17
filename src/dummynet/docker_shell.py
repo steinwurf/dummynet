@@ -66,16 +66,14 @@ class DockerShell(object):
         self.log.debug("Launched")
 
         try:
-            exit_code, stdout, stderr = await task
+            stdout, stderr = await task
         except asyncio.exceptions.CancelledError:
             if daemon:
                 self.log.debug("Deamon shutting down")
             else:
                 raise
-
         else:
-
-            self.log.debug(f"[{cmd!r} exited with {exit_code}]")
+            self.log.debug(f"[{cmd!r} exited]")
             if stdout:
                 self.log.info(f"[stdout]\n{stdout}")
             if stderr:
@@ -83,9 +81,6 @@ class DockerShell(object):
 
             if daemon:
                 raise RuntimeError("Deamon exit prematurely")
-
-            if exit_code != 0:
-                raise RuntimeError(f"{cmd} failed with exit code {exit_code}")
 
     def stop(self, timeout=1):
         """Stop the container"""
