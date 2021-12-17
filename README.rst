@@ -4,8 +4,8 @@ Introduction
 
 |PyPi| |Waf Python Tests| |Black| |Flake8| |Pip Install|
 
-.. |PyPi| image:: https://badge.fury.io/py/dummynet-python.svg
-    :target: https://badge.fury.io/py/dummynet-python
+.. |PyPi| image:: https://badge.fury.io/py/dummynet.svg
+    :target: https://badge.fury.io/py/dummynet
 
 .. |Waf Python Tests| image:: https://github.com/steinwurf/dummynet-python/actions/workflows/python-waf.yml/badge.svg
    :target: https://github.com/steinwurf/dummynet-python/actions/workflows/python-waf.yml
