@@ -5,6 +5,10 @@ every change, see the Git log.
 
 Latest
 ------
+* tbd
+
+1.0.2
+-----
 * Patch: Correct issue with dummynet vs dummynet-python
   naming.
 

@@ -9,7 +9,7 @@ import os
 
 top = "."
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 
 
 class UploadContext(BuildContext):
