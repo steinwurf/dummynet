@@ -44,7 +44,7 @@ Installation
 
 To install dummynet-python::
 
-    pip install dummynet-python
+    pip install dummynet
 
 Usage
 =====
