@@ -20,7 +20,7 @@ Introduction
       :target: https://github.com/steinwurf/dummynet-python/actions/workflows/pip.yml
 
 
-dummynet-python is a tool for working with dummy-networks in python on Linux
+dummynet is a tool for working with dummy-networks in python on Linux
 machines. By dummy-networks we refer to setups with network namespaces, virtual
 ethernets, etc.
 
@@ -42,7 +42,7 @@ issue if support is needed.
 Installation
 ============
 
-To install dummynet-python::
+To install dummynet::
 
     pip install dummynet
 
@@ -126,4 +126,3 @@ Notes
   avoid accidentally having access to resources not added to the Python
   package your users will install...
 * Python packaging guide: https://packaging.python.org/distributing/
-
