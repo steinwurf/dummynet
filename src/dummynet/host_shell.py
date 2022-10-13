@@ -55,6 +55,7 @@ class HostShell(object):
 
         try:
             stdout, stderr = await proc.communicate()
+            await asyncio.sleep(1)
         except asyncio.exceptions.CancelledError:
             if daemon:
                 self.log.debug("Deamon shutting down")
