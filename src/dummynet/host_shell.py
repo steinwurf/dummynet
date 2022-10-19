@@ -37,6 +37,7 @@ class HostShell(object):
         task = asyncio.current_task()
         task.cmd = cmd
         task.daemon = daemon
+        
 
         if delay > 0:
             self.log.debug(f"Waiting {delay} seconds")
@@ -64,6 +65,14 @@ class HostShell(object):
 
         else:
 
+            def get_result():
+                ret = ""
+                if stdout:
+                    ret += stdout.decode()
+                if stderr:
+                    ret += stderr.decode()
+                return ret
+
             self.log.debug(f"[{cmd!r} exited with {proc.returncode}]")
             if stdout:
                 self.log.info(f"[stdout]\n{stdout.decode()}")
@@ -75,3 +84,4 @@ class HostShell(object):
 
             if proc.returncode != 0:
                 raise RuntimeError(f"{cmd} failed with exit code {proc.returncode}")
+            task.result = get_result
