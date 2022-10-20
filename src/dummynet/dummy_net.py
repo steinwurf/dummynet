@@ -178,10 +178,24 @@ class DummyNet(object):
 
         return names
 
+    def netns_get_process_list(self, name):
+        """Returns a list of all processes in a network namespace"""
+        process_list = self.shell.run(cmd=f"ip netns pids {name}", cwd=None)
+        return process_list
+ 
+    def netns_kill_process(self, name, pid):
+        """Kills a process in a network namespace"""
+        self.shell.run(cmd=f"ip netns exec {name} kill -9 {pid}", cwd=None)
+
     def netns_delete(self, name):
         """Deletes a specific network namespace."""
+        # process_list = self.netns_get_process_list(name).splitlines()
+        # for process in process_list:
+            # self.netns_kill_process(name, process)
 
         self.shell.run(cmd=f"ip netns delete {name}", cwd=None)
+    
+
 
     def netns_add(self, name):
         """Adds a new network namespace.
