@@ -83,5 +83,5 @@ class HostShell(object):
                 raise RuntimeError("Deamon exit prematurely")
 
             if proc.returncode != 0:
-                raise RuntimeError(f"{cmd} failed with exit code {proc.returncode}")
+                raise RuntimeError(f"{cmd} failed with exit code {proc.returncode}, stdout: {stdout.decode()}, stderr: {stderr.decode()}")
             task.result = get_result
