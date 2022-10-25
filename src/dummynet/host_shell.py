@@ -9,7 +9,7 @@ class HostShell(object):
         self.log = log
         self.sudo = sudo
 
-    def run(self, cmd: str, cwd=None):
+    def run(self, cmd: str, cwd=None, detach=False):
         """Run a command.
         :param cmd: The command to run
         :param cwd: The current working directory i.e. where the command will
@@ -20,13 +20,18 @@ class HostShell(object):
             cmd = "sudo " + cmd
 
         self.log.debug(cmd)
-        return subprocess.check_output(
-            cmd,
-            shell=True,
-            stderr=subprocess.PIPE,
-            cwd=cwd,
-            text=True,
-        )
+
+        if (detach):
+            subprocess.Popen(cmd, shell=True, cwd=cwd)
+            return None
+        else:
+            return subprocess.check_output(
+                cmd,
+                shell=True,
+                stderr=subprocess.PIPE,
+                cwd=cwd,
+                text=True,
+            )
 
     async def run_async(self, cmd: str, daemon=False, delay=0, cwd=None):
         """Run an asynchronous command.

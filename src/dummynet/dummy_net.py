@@ -75,10 +75,10 @@ class DummyNet(object):
 
         self.shell.run(f"ip route add default via {ip}", cwd=None)
 
-    def run(self, cmd, cwd=None):
+    def run(self, cmd, cwd=None, detach=False):
         """Wrapper for the command-line access"""
 
-        return self.shell.run(cmd=cmd, cwd=cwd)
+        return self.shell.run(cmd=cmd, cwd=cwd, detach=detach)
 
     async def run_async(self, cmd, daemon=False, delay=0, cwd=None):
         """Wrapper for the concurrent command-line access"""
