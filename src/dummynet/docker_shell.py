@@ -22,7 +22,7 @@ class DockerShell(object):
             privileged=True,
         )
 
-    def run(self, cmd: str, cwd=None, **kwargs):
+    def run(self, cmd: str, detach=False, cwd=None, **kwargs):
         """Run a command.
         :param cmd: The command to run
         :param cwd: The current working directory i.e. where the command will
@@ -32,7 +32,10 @@ class DockerShell(object):
             self.open()
 
         self.log.debug(cmd)
-        exit_code, output = self.container.exec_run(cmd, workdir=cwd, **kwargs)
+        
+        exit_code, output = self.container.exec_run(cmd, workdir=cwd, detach=detach, **kwargs)
+        if detach:
+            return None
         if exit_code != 0:
             raise RuntimeError(f"{cmd} failed with exit code {exit_code}\n{output}")
         else:
