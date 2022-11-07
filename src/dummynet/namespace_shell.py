@@ -10,7 +10,9 @@ class NamespaceShell(object):
             run
         """
 
-        return self.shell.run(cmd=f"ip netns exec {self.name} {cmd}", cwd=cwd, detach=detach)
+        return self.shell.run(
+            cmd=f"ip netns exec {self.name} {cmd}", cwd=cwd, detach=detach
+        )
 
     async def run_async(self, cmd, daemon=False, delay=0, cwd=None):
         """Run a command in a shell asynchronously.

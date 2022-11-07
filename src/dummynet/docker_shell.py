@@ -32,8 +32,10 @@ class DockerShell(object):
             self.open()
 
         self.log.debug(cmd)
-        
-        exit_code, output = self.container.exec_run(cmd, workdir=cwd, detach=detach, **kwargs)
+
+        exit_code, output = self.container.exec_run(
+            cmd, workdir=cwd, detach=detach, **kwargs
+        )
         if detach:
             return None
         if exit_code != 0:

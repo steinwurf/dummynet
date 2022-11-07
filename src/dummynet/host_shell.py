@@ -21,7 +21,7 @@ class HostShell(object):
 
         self.log.debug(cmd)
 
-        if (detach):
+        if detach:
             subprocess.Popen(cmd, shell=True, cwd=cwd)
             return None
         else:
@@ -42,7 +42,6 @@ class HostShell(object):
         task = asyncio.current_task()
         task.cmd = cmd
         task.daemon = daemon
-        
 
         if delay > 0:
             self.log.debug(f"Waiting {delay} seconds")
@@ -88,5 +87,7 @@ class HostShell(object):
                 raise RuntimeError("Deamon exit prematurely")
 
             if proc.returncode != 0:
-                raise RuntimeError(f"{cmd} failed with exit code {proc.returncode}, stdout: {stdout.decode()}, stderr: {stderr.decode()}")
+                raise RuntimeError(
+                    f"{cmd} failed with exit code {proc.returncode}, stdout: {stdout.decode()}, stderr: {stderr.decode()}"
+                )
             task.result = get_result
