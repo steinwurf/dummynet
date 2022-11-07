@@ -188,10 +188,15 @@ class DummyNet(object):
         self.shell.run(cmd=f"ip netns exec {name} kill -9 {pid}", cwd=None)
 
     def netns_delete(self, name):
-        """Deletes a specific network namespace."""
-        # process_list = self.netns_get_process_list(name).splitlines()
-        # for process in process_list:
-            # self.netns_kill_process(name, process)
+        """Deletes a specific network namespace.
+        Note that before deleting a network namespace all processes in that
+        namespace should be killed. Using e.g.
+        
+        process_list = shell.netns_get_process_list(ns_name).splitlines()
+        for process in process_list:
+            self.netns_kill_process(name, process)
+
+        """
 
         self.shell.run(cmd=f"ip netns delete {name}", cwd=None)
     

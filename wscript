@@ -74,6 +74,61 @@ def upload(bld):
 
         venv.run(f"python -m twine upload {wheel}")
 
+def _create_venv(ctx, location):
+
+    requirements_txt = os.path.join(location, "requirements.txt")
+    requirements_in = os.path.join(location, "requirements.in")
+
+    if not os.path.isfile(requirements_txt):
+        with ctx.create_virtualenv() as venv:
+            venv.run("python -m pip install pip-tools")
+            venv.run(
+                "pip-compile {} --output-file {}".format(
+                    requirements_in, requirements_txt
+                )
+            )
+    giit = "giit==8.0.0"
+    # Hash the requirements.txt
+    sha1 = hashlib.sha1(
+        (open(requirements_txt, "r").read() + giit).encode("utf-8")
+    ).hexdigest()[:6]
+
+    # venv name
+    name = "venv-{}-{}".format(location, sha1)
+
+    if os.path.isdir(name):
+        # If directly already exits we should already have installed everything
+        pip_install = False
+    else:
+        pip_install = True
+
+    # Crate the venv
+    venv = ctx.create_virtualenv(name=name, overwrite=False)
+
+    if pip_install:
+        venv.run('python -m pip install "{}"'.format(giit))
+        venv.env["PIP_IGNORE_INSTALLED"] = ""
+        venv.run("python -m pip install -r {}".format(requirements_txt))
+
+    return venv
+
+
+def docs(ctx):
+    """Build the documentation"""
+
+    with ctx.create_virtualenv() as venv:
+        if not os.path.isfile("docs/requirements.txt"):
+            venv.run("python -m pip install pip-tools")
+            venv.run("pip-compile docs/requirements.in")
+
+        venv.run("python -m pip install -r docs/requirements.txt")
+        build_path = os.path.join(ctx.path.abspath(), "build", "docs")
+
+    venv.run(f"giit clean . --build_path {build_path}", cwd=ctx.path.abspath())
+    arguments = []
+    arguments.append(f"--build_path {build_path}")
+    venv.run("giit sphinx . {}".format(" ".join(arguments)), cwd=ctx.path.abspath())
+
 
 def _pytest(bld, venv):
 
