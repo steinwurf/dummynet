@@ -3,6 +3,8 @@ from subprocess import CalledProcessError
 from . import namespace_shell
 
 
+
+
 class DummyNet(object):
     def __init__(self, shell):
         self.shell = shell
@@ -24,11 +26,16 @@ class DummyNet(object):
 
         self.shell.run(cmd=f"ip link set {interface} netns {namespace}", cwd=None)
 
-    def link_list(self):
+    def link_list(self, link_type=None):
         """Returns the output of the 'ip link list' command parsed to a
         list of strings"""
 
-        output = self.shell.run(cmd="ip link list", cwd=None)
+        cmd = "ip link list"
+
+        if link_type != None:
+            cmd += f" type {link_type}"
+
+        output = self.shell.run(cmd=cmd, cwd=None)
 
         parser = re.compile(
             """
@@ -213,6 +220,16 @@ class DummyNet(object):
 
         shell = namespace_shell.NamespaceShell(name=name, shell=self.shell)
         return DummyNet(shell=shell)
+
+
+    def bridge_add(self, name):
+        """ Adds a bridge
+        """
+        self.shell.run(cmd=f"ip link add name {name} type bridge", cwd=None)
+
+    def bridge_list(self):
+        """ List the different bridges """
+        return self.link_list(link_type="bridge")
 
     def open(self):
         if hasattr(self.shell, "open"):
