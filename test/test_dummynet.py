@@ -6,11 +6,8 @@ import pathlib
 import json
 import sys
 
-peer1 = "demo0-eth"
-peer2 = "demo1-eth"
 
-namespace1 = "demo0"
-namespace2 = "demo1"
+
 
 ip1 = "10.0.0.1"
 ip2 = "10.0.0.2"
@@ -27,17 +24,38 @@ class MockShell:
             self.recording = recording
             self.shell = shell
             self.calls = []
+            self.in_error = False
 
         def close(self):
+
+            if self.in_error:
+                # If we  have an exception, don't save the recording
+                return
+
             with open(self.recording, "w") as f:
                 json.dump(self.calls, f, indent=4)
 
 
         def run(self, cmd: str, cwd=None, detach=False):
-            run = f"run(cmd={cmd}, cwd={cwd}, detach={detach})"
-            out = self.shell.run(cmd=cmd, cwd=cwd, detach=detach)
+
+            if self.in_error:
+                # We already have an error, don't record any more calls. We
+                # just pass commands to the host shell to allow cleanup to
+                # happen
+                return self.shell.run(cmd=cmd, cwd=cwd, detach=detach)
+
+            # Run the command and record the output
+            try:
+                run = f"run(cmd={cmd}, cwd={cwd}, detach={detach})"
+                out = self.shell.run(cmd=cmd, cwd=cwd, detach=detach)
+
+            except Exception as e:
+                self.in_error = True
+                raise e
+
             self.calls.append({"run": run, "out": out})
             return out
+
 
 
     class Playback:
@@ -46,17 +64,30 @@ class MockShell:
             with open(recording, "r") as f:
                 self.calls = json.load(f)
 
+            self.in_error = False
+
         def close(self):
 
-            if sys.exc_info()[0] is None:
-                # If we already have an exception, don't raise another one
+            if not self.in_error:
+                # If we didn't have an error, we should have used all the
+                # calls
                 assert(self.calls == [])
 
         def run(self, cmd: str, cwd=None, detach=False):
+
+            if self.in_error:
+                # We already have an error, don't check any more calls.
+                return
+
+            if len(self.calls) == 0:
+                self.in_error = True
+                raise Exception(f"No more calls in recording")
+
             call = self.calls.pop(0)
             run = f"run(cmd={cmd}, cwd={cwd}, detach={detach})"
 
             if run != call["run"]:
+                self.in_error = True
                 raise Exception(f"Expected {run} but got {call['run']}")
 
             return call["out"]
@@ -93,6 +124,7 @@ class MockShell:
 def test_run(datarecorder):
 
     log = logging.getLogger("dummynet")
+    log.setLevel(logging.DEBUG)
 
     # The host shell used if we don't have a recording
     host_shell = HostShell(log=log, sudo=True)
@@ -107,54 +139,70 @@ def test_run(datarecorder):
         assert namespaces == []
 
         # create two namespaces
-        demo0 = dnet.netns_add(name=namespace1)
-        demo1 = dnet.netns_add(name=namespace2)
+        demo0 = dnet.netns_add(name="demo0")
+        demo1 = dnet.netns_add(name="demo1")
+        demo2 = dnet.netns_add(name="demo2")
 
         # Get a list of the current namespaces
         namespaces = dnet.netns_list()
 
-        assert namespace1 in namespaces
-        assert namespace2 in namespaces
+        assert namespaces == ["demo2", "demo1", "demo0"]
 
-        # Add a link. This will go between the namespaces.
-        dnet.link_veth_add(p1_name=peer1, p2_name=peer2)
+        # Add a bridge in demo1
+        demo1.bridge_add(name="br0")
 
-        dnet.link_set(namespace=namespace1, interface=peer1)
-        dnet.link_set(namespace=namespace2, interface=peer2)
+        dnet.link_veth_add(p1_name="demo0-eth0", p2_name="demo1-eth0")
+        dnet.link_veth_add(p1_name="demo1-eth1", p2_name="demo2-eth0")
+
+        # Move the interfaces to the namespaces
+        dnet.link_set(namespace="demo0", interface="demo0-eth0")
+        dnet.link_set(namespace="demo1", interface="demo1-eth0")
+        dnet.link_set(namespace="demo1", interface="demo1-eth1")
+        dnet.link_set(namespace="demo2", interface="demo2-eth0")
+
+        demo1.bridge_set(name="br0", interface="demo1-eth0")
+        demo1.bridge_set(name="br0", interface="demo1-eth1")
 
         # Bind an IP-address to the two peers in the link.
-        demo0.addr_add(ip=ip1 + "/" + subnet, interface=peer1)
-        demo1.addr_add(ip=ip2 + "/" + subnet, interface=peer2)
+        demo0.addr_add(ip="10.0.0.1/24", interface="demo0-eth0")
+        demo2.addr_add(ip="10.0.0.2/24", interface="demo2-eth0")
 
         # Activate the interfaces.
-        demo0.up(interface=peer1)
-        demo1.up(interface=peer2)
+        demo0.up(interface="demo0-eth0")
+        demo1.up(interface="br0")
+        demo1.up(interface="demo1-eth0")
+        demo1.up(interface="demo1-eth1")
+        demo2.up(interface="demo2-eth0")
 
         # We will add 20 ms of delay, 1% packet loss, a queue limit of 100 packets
         # and 10 Mbit/s of bandwidth max.
-        demo0.tc(interface=peer1, delay=20, loss=1, limit=100, rate=10)
-        demo1.tc(interface=peer2, delay=20, loss=1, limit=100, rate=10)
+        demo1.tc(interface="demo1-eth0", delay=20, loss=1, limit=100, rate=10)
+        demo1.tc(interface="demo1-eth1", delay=20, loss=1, limit=100, rate=10)
 
         # Show the tc-configuration of the interfaces.
-        demo0.tc_show(interface=peer1)
-        demo1.tc_show(interface=peer2)
+        demo1.tc_show(interface="demo1-eth0")
+        demo1.tc_show(interface="demo1-eth0")
 
-        # Route the traffic through the given IPs in each of the namespaces
-        demo0.route(ip=ip1)
-        demo1.route(ip=ip2)
+        out = demo0.run(cmd="ping -c 10 10.0.0.2")
 
-        demo0.nat(ip=ip1, interface=peer1)
-        demo1.nat(ip=ip2, interface=peer2)
+        print(out)
+
+        # # Route the traffic through the given IPs in each of the namespaces
+        # demo0.route(ip=ip1)
+        # demo1.route(ip=ip2)
+
+        # demo0.nat(ip=ip1, interface=peer1)
+        # demo1.nat(ip=ip2, interface=peer2)
 
         # Clean up. Delete the link and the namespaces.
-        demo0.link_delete(interface=peer1)
+        #demo0.link_delete(interface=peer1)
 
-        demo1.bridge_add(name="br0")
-        demo1.bridge_add(name="br1")
 
-        assert(demo1.bridge_list() == ["br0", "br1"])
+        # demo1.bridge_add(name="br1")
 
-        dnet.netns_delete(name=namespace1)
-        dnet.netns_delete(name=namespace2)
+        # assert(demo1.bridge_list() == ["br0", "br1"])
+
+        # dnet.netns_delete(name=namespace1)
+        # dnet.netns_delete(name=namespace2)
 
 

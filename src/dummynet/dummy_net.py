@@ -4,10 +4,10 @@ from . import namespace_shell
 
 
 
-
 class DummyNet(object):
     def __init__(self, shell):
         self.shell = shell
+        self.cleanup = []
 
     def link_veth_add(self, p1_name, p2_name):
         """Adds a virtual ethernet between two endpoints.
@@ -60,6 +60,7 @@ class DummyNet(object):
 
             names.append(result.group("name"))
 
+        names.sort()
         return names
 
     def link_delete(self, interface):
@@ -185,14 +186,22 @@ class DummyNet(object):
 
         return names
 
-    def netns_get_process_list(self, name):
+    def netns_process_list(self, name):
         """Returns a list of all processes in a network namespace"""
         process_list = self.shell.run(cmd=f"ip netns pids {name}", cwd=None)
-        return process_list
+        return process_list.splitlines()
 
     def netns_kill_process(self, name, pid):
         """Kills a process in a network namespace"""
         self.shell.run(cmd=f"ip netns exec {name} kill -9 {pid}", cwd=None)
+
+
+    def netns_kill_all(self, name):
+        """Kills all processes running in a network namespace"""
+
+        for process in self.netns_process_list(name):
+            self.netns_kill_process(name, process)
+
 
     def netns_delete(self, name):
         """Deletes a specific network namespace.
@@ -217,15 +226,34 @@ class DummyNet(object):
         to configure the networks."""
 
         self.shell.run(cmd=f"ip netns add {name}", cwd=None)
-
         shell = namespace_shell.NamespaceShell(name=name, shell=self.shell)
-        return DummyNet(shell=shell)
+
+        dnet = DummyNet(shell=shell)
+
+        def cleanup():
+            self.netns_kill_all(name=name)
+            self.netns_delete(name = name)
+            dnet.close()
+
+        self.cleanup.append(cleanup)
+
+        return dnet
 
 
     def bridge_add(self, name):
         """ Adds a bridge
         """
         self.shell.run(cmd=f"ip link add name {name} type bridge", cwd=None)
+
+    def bridge_up(self, name):
+        """ Brings a bridge up
+        """
+        self.up(interface=name)
+
+    def bridge_set(self, name, interface):
+        """ Adds an interface to a bridge
+        """
+        self.shell.run(cmd=f"ip link set {interface} master {name}", cwd=None)
 
     def bridge_list(self):
         """ List the different bridges """
@@ -238,6 +266,9 @@ class DummyNet(object):
     def close(self):
         if hasattr(self.shell, "close"):
             self.shell.close()
+
+        for cleanup in self.cleanup:
+            cleanup()
 
     def __enter__(self):
         self.open()

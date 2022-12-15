@@ -12,99 +12,99 @@
         "out": ""
     },
     {
+        "run": "run(cmd=ip netns add demo2, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
         "run": "run(cmd=ip netns list, cwd=None, detach=False)",
-        "out": "demo1\ndemo0\n"
-    },
-    {
-        "run": "run(cmd=ip link add demo0-eth type veth peer name demo1-eth, cwd=None, detach=False)",
-        "out": ""
-    },
-    {
-        "run": "run(cmd=ip link set demo0-eth netns demo0, cwd=None, detach=False)",
-        "out": ""
-    },
-    {
-        "run": "run(cmd=ip link set demo1-eth netns demo1, cwd=None, detach=False)",
-        "out": ""
-    },
-    {
-        "run": "run(cmd=ip netns exec demo0 ip addr add 10.0.0.1/24 dev demo0-eth, cwd=None, detach=False)",
-        "out": ""
-    },
-    {
-        "run": "run(cmd=ip netns exec demo1 ip addr add 10.0.0.2/24 dev demo1-eth, cwd=None, detach=False)",
-        "out": ""
-    },
-    {
-        "run": "run(cmd=ip netns exec demo0 ip link set dev demo0-eth up, cwd=None, detach=False)",
-        "out": ""
-    },
-    {
-        "run": "run(cmd=ip netns exec demo1 ip link set dev demo1-eth up, cwd=None, detach=False)",
-        "out": ""
-    },
-    {
-        "run": "run(cmd=ip netns exec demo0 tc qdisc show dev demo0-eth, cwd=None, detach=False)",
-        "out": "qdisc noqueue 0: root refcnt 2 \n"
-    },
-    {
-        "run": "run(cmd=ip netns exec demo0 tc qdisc add dev demo0-eth root netem delay 20ms loss 1% rate 10Mbit limit 100, cwd=None, detach=False)",
-        "out": ""
-    },
-    {
-        "run": "run(cmd=ip netns exec demo1 tc qdisc show dev demo1-eth, cwd=None, detach=False)",
-        "out": "qdisc noqueue 0: root refcnt 2 \n"
-    },
-    {
-        "run": "run(cmd=ip netns exec demo1 tc qdisc add dev demo1-eth root netem delay 20ms loss 1% rate 10Mbit limit 100, cwd=None, detach=False)",
-        "out": ""
-    },
-    {
-        "run": "run(cmd=ip netns exec demo0 tc qdisc show dev demo0-eth, cwd=None, detach=False)",
-        "out": "qdisc netem 8013: root refcnt 17 limit 100 delay 20ms loss 1% rate 10Mbit\n"
-    },
-    {
-        "run": "run(cmd=ip netns exec demo1 tc qdisc show dev demo1-eth, cwd=None, detach=False)",
-        "out": "qdisc netem 8014: root refcnt 17 limit 100 delay 20ms loss 1% rate 10Mbit\n"
-    },
-    {
-        "run": "run(cmd=ip netns exec demo0 ip route add default via 10.0.0.1, cwd=None, detach=False)",
-        "out": ""
-    },
-    {
-        "run": "run(cmd=ip netns exec demo1 ip route add default via 10.0.0.2, cwd=None, detach=False)",
-        "out": ""
-    },
-    {
-        "run": "run(cmd=ip netns exec demo0 iptables -t nat -A POSTROUTING -s 10.0.0.1 -o demo0-eth -j MASQUERADE, cwd=None, detach=False)",
-        "out": ""
-    },
-    {
-        "run": "run(cmd=ip netns exec demo1 iptables -t nat -A POSTROUTING -s 10.0.0.2 -o demo1-eth -j MASQUERADE, cwd=None, detach=False)",
-        "out": ""
-    },
-    {
-        "run": "run(cmd=ip netns exec demo0 ip link delete demo0-eth, cwd=None, detach=False)",
-        "out": ""
+        "out": "demo2\ndemo1\ndemo0\n"
     },
     {
         "run": "run(cmd=ip netns exec demo1 ip link add name br0 type bridge, cwd=None, detach=False)",
         "out": ""
     },
     {
-        "run": "run(cmd=ip netns exec demo1 ip link add name br1 type bridge, cwd=None, detach=False)",
+        "run": "run(cmd=ip link add demo0-eth0 type veth peer name demo1-eth0, cwd=None, detach=False)",
         "out": ""
     },
     {
-        "run": "run(cmd=ip netns exec demo1 ip link list type bridge, cwd=None, detach=False)",
-        "out": "2: br0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000\n    link/ether d2:40:b0:d5:16:e7 brd ff:ff:ff:ff:ff:ff\n3: br1: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000\n    link/ether ea:01:6e:86:0f:dc brd ff:ff:ff:ff:ff:ff\n"
-    },
-    {
-        "run": "run(cmd=ip netns delete demo0, cwd=None, detach=False)",
+        "run": "run(cmd=ip link add demo1-eth1 type veth peer name demo2-eth0, cwd=None, detach=False)",
         "out": ""
     },
     {
-        "run": "run(cmd=ip netns delete demo1, cwd=None, detach=False)",
+        "run": "run(cmd=ip link set demo0-eth0 netns demo0, cwd=None, detach=False)",
         "out": ""
+    },
+    {
+        "run": "run(cmd=ip link set demo1-eth0 netns demo1, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip link set demo1-eth1 netns demo1, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip link set demo2-eth0 netns demo2, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns exec demo1 ip link set demo1-eth0 master br0, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns exec demo1 ip link set demo1-eth1 master br0, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns exec demo0 ip addr add 10.0.0.1/24 dev demo0-eth0, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns exec demo2 ip addr add 10.0.0.2/24 dev demo2-eth0, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns exec demo0 ip link set dev demo0-eth0 up, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns exec demo1 ip link set dev br0 up, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns exec demo1 ip link set dev demo1-eth0 up, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns exec demo1 ip link set dev demo1-eth1 up, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns exec demo2 ip link set dev demo2-eth0 up, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns exec demo1 tc qdisc show dev demo1-eth0, cwd=None, detach=False)",
+        "out": "qdisc noqueue 0: root refcnt 2 \n"
+    },
+    {
+        "run": "run(cmd=ip netns exec demo1 tc qdisc add dev demo1-eth0 root netem delay 20ms loss 1% rate 10Mbit limit 100, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns exec demo1 tc qdisc show dev demo1-eth1, cwd=None, detach=False)",
+        "out": "qdisc noqueue 0: root refcnt 2 \n"
+    },
+    {
+        "run": "run(cmd=ip netns exec demo1 tc qdisc add dev demo1-eth1 root netem delay 20ms loss 1% rate 10Mbit limit 100, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns exec demo1 tc qdisc show dev demo1-eth0, cwd=None, detach=False)",
+        "out": "qdisc netem 8007: root refcnt 33 limit 100 delay 20ms loss 1% rate 10Mbit\n"
+    },
+    {
+        "run": "run(cmd=ip netns exec demo1 tc qdisc show dev demo1-eth0, cwd=None, detach=False)",
+        "out": "qdisc netem 8007: root refcnt 33 limit 100 delay 20ms loss 1% rate 10Mbit\n"
     }
 ]
