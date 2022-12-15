@@ -3,7 +3,6 @@ from subprocess import CalledProcessError
 from . import namespace_shell
 
 
-
 class DummyNet(object):
     def __init__(self, shell):
         self.shell = shell
@@ -195,13 +194,11 @@ class DummyNet(object):
         """Kills a process in a network namespace"""
         self.shell.run(cmd=f"ip netns exec {name} kill -9 {pid}", cwd=None)
 
-
     def netns_kill_all(self, name):
         """Kills all processes running in a network namespace"""
 
         for process in self.netns_process_list(name):
             self.netns_kill_process(name, process)
-
 
     def netns_delete(self, name):
         """Deletes a specific network namespace.
@@ -232,31 +229,27 @@ class DummyNet(object):
 
         def cleanup():
             self.netns_kill_all(name=name)
-            self.netns_delete(name = name)
+            self.netns_delete(name=name)
             dnet.close()
 
         self.cleanup.append(cleanup)
 
         return dnet
 
-
     def bridge_add(self, name):
-        """ Adds a bridge
-        """
+        """Adds a bridge"""
         self.shell.run(cmd=f"ip link add name {name} type bridge", cwd=None)
 
     def bridge_up(self, name):
-        """ Brings a bridge up
-        """
+        """Brings a bridge up"""
         self.up(interface=name)
 
     def bridge_set(self, name, interface):
-        """ Adds an interface to a bridge
-        """
+        """Adds an interface to a bridge"""
         self.shell.run(cmd=f"ip link set {interface} master {name}", cwd=None)
 
     def bridge_list(self):
-        """ List the different bridges """
+        """List the different bridges"""
         return self.link_list(link_type="bridge")
 
     def open(self):
@@ -264,11 +257,12 @@ class DummyNet(object):
             self.shell.open()
 
     def close(self):
-        if hasattr(self.shell, "close"):
-            self.shell.close()
 
         for cleanup in self.cleanup:
             cleanup()
+
+        if hasattr(self.shell, "close"):
+            self.shell.close()
 
     def __enter__(self):
         self.open()

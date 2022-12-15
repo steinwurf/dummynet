@@ -7,18 +7,8 @@ import json
 import sys
 
 
-
-
-ip1 = "10.0.0.1"
-ip2 = "10.0.0.2"
-
-subnet = "24"
-
-
 class MockShell:
-
     class Record:
-
         def open(self, recording, shell):
 
             self.recording = recording
@@ -34,7 +24,6 @@ class MockShell:
 
             with open(self.recording, "w") as f:
                 json.dump(self.calls, f, indent=4)
-
 
         def run(self, cmd: str, cwd=None, detach=False):
 
@@ -56,10 +45,7 @@ class MockShell:
             self.calls.append({"run": run, "out": out})
             return out
 
-
-
     class Playback:
-
         def open(self, recording):
             with open(recording, "r") as f:
                 self.calls = json.load(f)
@@ -71,7 +57,7 @@ class MockShell:
             if not self.in_error:
                 # If we didn't have an error, we should have used all the
                 # calls
-                assert(self.calls == [])
+                assert self.calls == []
 
         def run(self, cmd: str, cwd=None, detach=False):
 
@@ -101,7 +87,7 @@ class MockShell:
 
     def open(self):
 
-        if  pathlib.Path(self.recording).is_file():
+        if pathlib.Path(self.recording).is_file():
             self.mode = MockShell.Playback()
             self.mode.open(recording=self.recording)
 
@@ -111,11 +97,10 @@ class MockShell:
 
     def close(self):
         self.mode.close()
-
+        self.mode = None
 
     def run(self, cmd: str, cwd=None, detach=False):
         return self.mode.run(cmd=cmd, cwd=cwd, detach=detach)
-
 
     def run_async(self, cmd: str, daemon=False, delay=0, cwd=None):
         assert False
@@ -133,6 +118,9 @@ def test_run(datarecorder):
     shell = MockShell(recording="test/data/calls.json", shell=host_shell)
 
     with DummyNet(shell=shell) as dnet:
+
+        host = dnet.host()
+
 
         # Get a list of the current namespaces
         namespaces = dnet.netns_list()
@@ -195,8 +183,7 @@ def test_run(datarecorder):
         # demo1.nat(ip=ip2, interface=peer2)
 
         # Clean up. Delete the link and the namespaces.
-        #demo0.link_delete(interface=peer1)
-
+        # demo0.link_delete(interface=peer1)
 
         # demo1.bridge_add(name="br1")
 
@@ -204,5 +191,3 @@ def test_run(datarecorder):
 
         # dnet.netns_delete(name=namespace1)
         # dnet.netns_delete(name=namespace2)
-
-
