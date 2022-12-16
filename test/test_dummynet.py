@@ -9,6 +9,10 @@ import sys
 
 class MockShell:
     class Record:
+
+        def __init__(self):
+            self.name = "Record"
+
         def open(self, recording, shell):
 
             self.recording = recording
@@ -46,6 +50,10 @@ class MockShell:
             return out
 
     class Playback:
+
+        def __init__(self):
+            self.name = "Playback"
+
         def open(self, recording):
             with open(recording, "r") as f:
                 self.calls = json.load(f)
@@ -116,6 +124,10 @@ def test_run(datarecorder):
 
     # Create a mock shell which will receive the calls performed by the DummyNet
     shell = MockShell(recording="test/data/calls.json", shell=host_shell)
+
+    # DummyNet wrapper that will prevent clean up from happening in playback
+    # mode if an exception occurs
+    
 
     with DummyNet(shell=shell) as dnet:
 
