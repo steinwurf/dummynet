@@ -86,22 +86,18 @@ class MockShell:
 
             return call["out"]
 
-    def __init__(self, recording, shell):
-
-        self.recording = recording
-        self.shell = shell
-
+    def __init__(self):
         self.mode = None
 
-    def open(self):
+    def open(self, recording, shell):
 
-        if pathlib.Path(self.recording).is_file():
+        if pathlib.Path(recording).is_file():
             self.mode = MockShell.Playback()
-            self.mode.open(recording=self.recording)
+            self.mode.open(recording=recording)
 
         else:
             self.mode = MockShell.Record()
-            self.mode.open(recording=self.recording, shell=self.shell)
+            self.mode.open(recording=recording, shell=shell)
 
     def close(self):
         self.mode.close()
@@ -114,7 +110,7 @@ class MockShell:
         assert False
 
 
-def test_run(datarecorder):
+def test_run():
 
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
@@ -123,42 +119,40 @@ def test_run(datarecorder):
     host_shell = HostShell(log=log, sudo=True)
 
     # Create a mock shell which will receive the calls performed by the DummyNet
-    shell = MockShell(recording="test/data/calls.json", shell=host_shell)
+    shell = MockShell()
+    shell.open(recording="test/data/calls.json", shell=host_shell)
 
     # DummyNet wrapper that will prevent clean up from happening in playback
     # mode if an exception occurs
-    
+    net = DummyNet(shell=shell)
 
-    with DummyNet(shell=shell) as dnet:
-
-        host = dnet.host()
-
+    try:
 
         # Get a list of the current namespaces
-        namespaces = dnet.netns_list()
+        namespaces = net.netns_list()
         assert namespaces == []
 
         # create two namespaces
-        demo0 = dnet.netns_add(name="demo0")
-        demo1 = dnet.netns_add(name="demo1")
-        demo2 = dnet.netns_add(name="demo2")
+        demo0 = net.netns_add(name="demo0")
+        demo1 = net.netns_add(name="demo1")
+        demo2 = net.netns_add(name="demo2")
 
         # Get a list of the current namespaces
-        namespaces = dnet.netns_list()
+        namespaces = net.netns_list()
 
         assert namespaces == ["demo2", "demo1", "demo0"]
 
         # Add a bridge in demo1
         demo1.bridge_add(name="br0")
 
-        dnet.link_veth_add(p1_name="demo0-eth0", p2_name="demo1-eth0")
-        dnet.link_veth_add(p1_name="demo1-eth1", p2_name="demo2-eth0")
+        net.link_veth_add(p1_name="demo0-eth0", p2_name="demo1-eth0")
+        net.link_veth_add(p1_name="demo1-eth1", p2_name="demo2-eth0")
 
         # Move the interfaces to the namespaces
-        dnet.link_set(namespace="demo0", interface="demo0-eth0")
-        dnet.link_set(namespace="demo1", interface="demo1-eth0")
-        dnet.link_set(namespace="demo1", interface="demo1-eth1")
-        dnet.link_set(namespace="demo2", interface="demo2-eth0")
+        net.link_set(namespace="demo0", interface="demo0-eth0")
+        net.link_set(namespace="demo1", interface="demo1-eth0")
+        net.link_set(namespace="demo1", interface="demo1-eth1")
+        net.link_set(namespace="demo2", interface="demo2-eth0")
 
         demo1.bridge_set(name="br0", interface="demo1-eth0")
         demo1.bridge_set(name="br0", interface="demo1-eth1")
@@ -185,21 +179,12 @@ def test_run(datarecorder):
 
         out = demo0.run(cmd="ping -c 10 10.0.0.2")
 
-        print(out)
+    finally:
 
-        # # Route the traffic through the given IPs in each of the namespaces
-        # demo0.route(ip=ip1)
-        # demo1.route(ip=ip2)
+        # Clean up.
+        net.cleanup()
 
-        # demo0.nat(ip=ip1, interface=peer1)
-        # demo1.nat(ip=ip2, interface=peer2)
+        # Close the mock shell
+        shell.close()
 
-        # Clean up. Delete the link and the namespaces.
-        # demo0.link_delete(interface=peer1)
 
-        # demo1.bridge_add(name="br1")
-
-        # assert(demo1.bridge_list() == ["br0", "br1"])
-
-        # dnet.netns_delete(name=namespace1)
-        # dnet.netns_delete(name=namespace2)

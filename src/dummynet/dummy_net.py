@@ -6,7 +6,7 @@ from . import namespace_shell
 class DummyNet(object):
     def __init__(self, shell):
         self.shell = shell
-        self.cleanup = []
+        self.cleaners = []
 
     def link_veth_add(self, p1_name, p2_name):
         """Adds a virtual ethernet between two endpoints.
@@ -227,12 +227,13 @@ class DummyNet(object):
 
         dnet = DummyNet(shell=shell)
 
-        def cleanup():
+        # Store cleanup function to remove the created namespace
+        def cleaner():
             self.netns_kill_all(name=name)
             self.netns_delete(name=name)
-            dnet.close()
+            dnet.cleanup()
 
-        self.cleanup.append(cleanup)
+        self.cleaners.append(cleaner)
 
         return dnet
 
@@ -252,21 +253,9 @@ class DummyNet(object):
         """List the different bridges"""
         return self.link_list(link_type="bridge")
 
-    def open(self):
-        if hasattr(self.shell, "open"):
-            self.shell.open()
+    def cleanup(self):
+        """Cleans up all the created network namespaces and bridges"""
 
-    def close(self):
+        for cleaner in self.cleaners:
+            cleaner()
 
-        for cleanup in self.cleanup:
-            cleanup()
-
-        if hasattr(self.shell, "close"):
-            self.shell.close()
-
-    def __enter__(self):
-        self.open()
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.close()

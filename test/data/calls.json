@@ -101,14 +101,38 @@
     },
     {
         "run": "run(cmd=ip netns exec demo1 tc qdisc show dev demo1-eth0, cwd=None, detach=False)",
-        "out": "qdisc netem 8001: root refcnt 17 limit 100 delay 20ms loss 1% rate 10Mbit\n"
+        "out": "qdisc netem 8001: root refcnt 33 limit 100 delay 20ms loss 1% rate 10Mbit\n"
     },
     {
         "run": "run(cmd=ip netns exec demo1 tc qdisc show dev demo1-eth0, cwd=None, detach=False)",
-        "out": "qdisc netem 8001: root refcnt 17 limit 100 delay 20ms loss 1% rate 10Mbit\n"
+        "out": "qdisc netem 8001: root refcnt 33 limit 100 delay 20ms loss 1% rate 10Mbit\n"
     },
     {
         "run": "run(cmd=ip netns exec demo0 ping -c 10 10.0.0.2, cwd=None, detach=False)",
-        "out": "PING 10.0.0.2 (10.0.0.2) 56(84) bytes of data.\n64 bytes from 10.0.0.2: icmp_seq=1 ttl=64 time=80.4 ms\n64 bytes from 10.0.0.2: icmp_seq=2 ttl=64 time=40.6 ms\n64 bytes from 10.0.0.2: icmp_seq=3 ttl=64 time=40.6 ms\n64 bytes from 10.0.0.2: icmp_seq=4 ttl=64 time=40.7 ms\n64 bytes from 10.0.0.2: icmp_seq=5 ttl=64 time=40.7 ms\n64 bytes from 10.0.0.2: icmp_seq=6 ttl=64 time=40.5 ms\n64 bytes from 10.0.0.2: icmp_seq=7 ttl=64 time=40.5 ms\n64 bytes from 10.0.0.2: icmp_seq=8 ttl=64 time=40.5 ms\n64 bytes from 10.0.0.2: icmp_seq=9 ttl=64 time=40.3 ms\n64 bytes from 10.0.0.2: icmp_seq=10 ttl=64 time=40.7 ms\n\n--- 10.0.0.2 ping statistics ---\n10 packets transmitted, 10 received, 0% packet loss, time 9015ms\nrtt min/avg/max/mdev = 40.279/44.542/80.405/11.954 ms\n"
+        "out": "PING 10.0.0.2 (10.0.0.2) 56(84) bytes of data.\n64 bytes from 10.0.0.2: icmp_seq=1 ttl=64 time=80.3 ms\n64 bytes from 10.0.0.2: icmp_seq=2 ttl=64 time=40.5 ms\n64 bytes from 10.0.0.2: icmp_seq=3 ttl=64 time=40.5 ms\n64 bytes from 10.0.0.2: icmp_seq=4 ttl=64 time=40.7 ms\n64 bytes from 10.0.0.2: icmp_seq=5 ttl=64 time=40.3 ms\n64 bytes from 10.0.0.2: icmp_seq=6 ttl=64 time=40.3 ms\n64 bytes from 10.0.0.2: icmp_seq=7 ttl=64 time=40.2 ms\n64 bytes from 10.0.0.2: icmp_seq=8 ttl=64 time=40.5 ms\n64 bytes from 10.0.0.2: icmp_seq=9 ttl=64 time=40.5 ms\n64 bytes from 10.0.0.2: icmp_seq=10 ttl=64 time=40.2 ms\n\n--- 10.0.0.2 ping statistics ---\n10 packets transmitted, 10 received, 0% packet loss, time 9013ms\nrtt min/avg/max/mdev = 40.239/44.416/80.330/11.972 ms\n"
+    },
+    {
+        "run": "run(cmd=ip netns pids demo0, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns delete demo0, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns pids demo1, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns delete demo1, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns pids demo2, cwd=None, detach=False)",
+        "out": ""
+    },
+    {
+        "run": "run(cmd=ip netns delete demo2, cwd=None, detach=False)",
+        "out": ""
     }
 ]
