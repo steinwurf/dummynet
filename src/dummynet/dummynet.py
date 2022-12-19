@@ -258,4 +258,3 @@ class DummyNet(object):
 
         for cleaner in self.cleaners:
             cleaner()
-
