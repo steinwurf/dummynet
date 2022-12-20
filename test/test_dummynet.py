@@ -9,7 +9,7 @@ import mockshell
 def test_run():
 
     log = logging.getLogger("dummynet")
-    log.setLevel(logging.DEBUG)
+
 
     # The host shell used if we don't have a recording
     host_shell = HostShell(log=log, sudo=True)
