@@ -1,15 +1,16 @@
 from dummynet import DummyNet
 from dummynet import HostShell
+from dummynet import TestMonitor
 
 import logging
+import time
 
 import mockshell
 
 
-def test_run():
+def _test_run():
 
     log = logging.getLogger("dummynet")
-
 
     # The host shell used if we don't have a recording
     host_shell = HostShell(log=log, sudo=True)
@@ -84,3 +85,62 @@ def test_run():
 
         # Close the mock shell
         shell.close()
+
+
+def test_run():
+
+    log = logging.getLogger("dummynet")
+    log.setLevel(logging.DEBUG)
+    log.addHandler(logging.StreamHandler())
+
+    # Create a test montor
+    test_monitor = TestMonitor()
+
+    # The host shell used if we don't have a recording
+    shell = HostShell(log=log, sudo=True, test_monitor=test_monitor)
+
+    # DummyNet wrapper that will prevent clean up from happening in playback
+    # mode if an exception occurs
+    net = DummyNet(shell=shell)
+
+    try:
+
+        # Run a command on the host
+        out = net.run(cmd="ping -c 5 8.8.8.8")
+        out.match(stdout="5 packets transmitted*", stderr=None)
+
+        out = net.run_async(cmd="ping -c 5000 8.8.8.8")
+
+        end_time = time.time() + 2
+
+        while test_monitor.run():
+            if time.time() >= end_time:
+                log.debug("Test timeout")
+                test_monitor.stop()
+
+        net.run_async(cmd="ping -c 5 8.8.8.8", daemon=True)
+        net.run_async(cmd="ping -c 5000 8.8.8.8")
+
+        end_time = time.time() + 20
+
+        while test_monitor.run():
+            if time.time() >= end_time:
+                log.debug("Test timeout")
+                test_monitor.stop()
+
+        # Get a list of the current namespaces
+        namespaces = net.netns_list()
+
+        demo0 = net.netns_add(name="demo0")
+
+        demo0.run(cmd="ping -c 10 8.8.8.8")
+
+    finally:
+
+        # Clean up.
+        net.cleanup()
+
+        # Close any running async commands
+        test_monitor.stop()
+
+    assert False

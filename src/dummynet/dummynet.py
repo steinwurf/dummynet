@@ -82,15 +82,15 @@ class DummyNet(object):
 
         self.shell.run(f"ip route add default via {ip}", cwd=None)
 
-    def run(self, cmd, cwd=None, detach=False):
+    def run(self, cmd, cwd=None):
         """Wrapper for the command-line access"""
 
-        return self.shell.run(cmd=cmd, cwd=cwd, detach=detach)
+        return self.shell.run(cmd=cmd, cwd=cwd)
 
-    async def run_async(self, cmd, daemon=False, delay=0, cwd=None):
+    def run_async(self, cmd, daemon=False, cwd=None):
         """Wrapper for the concurrent command-line access"""
 
-        await self.shell.run_async(cmd=cmd, daemon=daemon, delay=delay, cwd=cwd)
+        return self.shell.run_async(cmd=cmd, daemon=daemon, cwd=cwd)
 
     def tc_show(self, interface, cwd=None):
         """Shows the current traffic-control configurations in the given
@@ -175,10 +175,10 @@ class DummyNet(object):
     def netns_list(self):
         """Returns a list of all network namespaces. Runs 'ip netns list'"""
 
-        output = self.shell.run(cmd="ip netns list", cwd=None)
+        result = self.shell.run(cmd="ip netns list", cwd=None)
         names = []
 
-        for line in output.splitlines():
+        for line in result.stdout.splitlines():
             # The name is the first word followed by a space
             name = line.split(" ")[0]
             names.append(name)
@@ -187,8 +187,8 @@ class DummyNet(object):
 
     def netns_process_list(self, name):
         """Returns a list of all processes in a network namespace"""
-        process_list = self.shell.run(cmd=f"ip netns pids {name}", cwd=None)
-        return process_list.splitlines()
+        result = self.shell.run(cmd=f"ip netns pids {name}", cwd=None)
+        return result.stdout.splitlines()
 
     def netns_kill_process(self, name, pid):
         """Kills a process in a network namespace"""
