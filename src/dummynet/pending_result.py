@@ -1,4 +1,5 @@
-from . import runresult
+from . import run_result
+from . import errors
 
 
 class PendingResult:
@@ -11,22 +12,25 @@ class PendingResult:
         self.process = process
         self.cmd = cmd
         self.cwd = cwd
-        self.result = None
+        self._result = None
 
-    def match(self, stdout=None, stderr=None):
-        if self.result:
-            self.result.match(stdout=stdout, stderr=stderr)
+    @property
+    def result(self):
+
+        if self._result:
+            return self._result
+
         self.process.poll()
+
         if self.process.returncode is None:
-            raise RuntimeError(
-                "Process {} in {} not terminated "
-                "while getting result".format(self.command, self.cwd)
-            )
-        self.result = runresult.RunResult(
-            command=self.command,
+            raise errors.ProcessRunningError(self.cmd, self.cwd)
+
+        self._result = run_result.RunResult(
+            cmd=self.cmd,
             cwd=self.cwd,
             stdout=self.process.stdout.read(),
             stderr=self.process.stderr.read(),
             returncode=self.process.returncode,
         )
-        self.result.match(stdout=stdout, stderr=stderr)
+
+        return self._result

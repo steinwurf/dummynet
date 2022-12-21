@@ -1,15 +1,16 @@
 import subprocess
 import time
 
-from . import runresult
-from . import pendingresult
+from . import run_result
+from . import pending_result
 from . import errors
+from . import process
 
 
 class HostShell(object):
     """A shell object for running commands"""
 
-    def __init__(self, log, sudo: bool, test_monitor):
+    def __init__(self, log, sudo: bool, process_monitor):
         """Create a new HostShell object
         :param log: The logger to use
         :param sudo: Whether to run commands with sudo
@@ -19,7 +20,7 @@ class HostShell(object):
         """
         self.log = log
         self.sudo = sudo
-        self.test_monitor = test_monitor
+        self.process_monitor = process_monitor
 
     def run(self, cmd: str, cwd=None):
         """Run a synchronous command (blocking).
@@ -45,12 +46,19 @@ class HostShell(object):
             text=True,
         )
 
+        # Here we wait for the process to exit
         # Warning: this can fail with large numbers of fds!
         stdout, stderr = process.communicate()
         returncode = process.wait()
 
-        result = runresult.RunResult(
-            command=cmd, cwd=cwd, stdout=stdout, stderr=stderr, returncode=returncode
+        result = run_result.RunResult(
+            cmd=cmd,
+            cwd=cwd,
+            stdout=stdout,
+            stderr=stderr,
+            returncode=returncode,
+            is_async=False,
+            is_daemon=False,
         )
 
         if result.returncode != 0:
@@ -70,7 +78,7 @@ class HostShell(object):
         self.log.debug(cmd)
 
         # Launch the command
-        process = subprocess.Popen(
+        popen = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -81,11 +89,21 @@ class HostShell(object):
             text=True,
         )
 
-        self.test_monitor.add_process(process=process, cmd=cmd, cwd=cwd, daemon=daemon)
+        running = process.Process(
+            popen=popen,
+            cmd=cmd,
+            cwd=cwd,
+            is_async=True,
+            is_daemon=daemon,
+        )
+
+        self.process_monitor.add_process(
+            process=running,
+        )
 
         # If we are launching a daemon we wait 0.5 sec for
         # it to launch
         if daemon:
             time.sleep(0.5)
 
-        return pendingresult.PendingResult(process=process, cmd=cmd, cwd=cwd)
+        return running

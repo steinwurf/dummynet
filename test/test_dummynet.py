@@ -1,9 +1,12 @@
 from dummynet import DummyNet
 from dummynet import HostShell
-from dummynet import TestMonitor
+from dummynet import ProcessMonitor
+
+import dummynet
 
 import logging
 import time
+import pytest
 
 import mockshell
 
@@ -87,17 +90,17 @@ def _test_run():
         shell.close()
 
 
-def test_run():
+def test_with_timeout():
 
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
     log.addHandler(logging.StreamHandler())
 
-    # Create a test montor
-    test_monitor = TestMonitor()
+    # Create a process monitor
+    process_monitor = ProcessMonitor()
 
     # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=True, test_monitor=test_monitor)
+    shell = HostShell(log=log, sudo=True, process_monitor=process_monitor)
 
     # DummyNet wrapper that will prevent clean up from happening in playback
     # mode if an exception occurs
@@ -113,27 +116,10 @@ def test_run():
 
         end_time = time.time() + 2
 
-        while test_monitor.run():
+        while process_monitor.run():
             if time.time() >= end_time:
                 log.debug("Test timeout")
-                test_monitor.stop()
-
-        net.run_async(cmd="ping -c 5 8.8.8.8", daemon=True)
-        net.run_async(cmd="ping -c 5000 8.8.8.8")
-
-        end_time = time.time() + 20
-
-        while test_monitor.run():
-            if time.time() >= end_time:
-                log.debug("Test timeout")
-                test_monitor.stop()
-
-        # Get a list of the current namespaces
-        namespaces = net.netns_list()
-
-        demo0 = net.netns_add(name="demo0")
-
-        demo0.run(cmd="ping -c 10 8.8.8.8")
+                break
 
     finally:
 
@@ -141,6 +127,149 @@ def test_run():
         net.cleanup()
 
         # Close any running async commands
-        test_monitor.stop()
+        process_monitor.stop()
 
-    assert False
+
+def test_daemon_exit():
+
+    log = logging.getLogger("dummynet")
+    log.setLevel(logging.DEBUG)
+    log.addHandler(logging.StreamHandler())
+
+    # Create a process monitor
+    process_monitor = ProcessMonitor()
+
+    # The host shell used if we don't have a recording
+    shell = HostShell(log=log, sudo=True, process_monitor=process_monitor)
+
+    try:
+
+        # Run two commands on the host where the daemon will exit
+        # before the non-daemon command
+        shell.run_async(cmd="ping -c 5 8.8.8.8", daemon=True)
+        shell.run_async(cmd="ping -c 50 8.8.8.8")
+
+        with pytest.raises(dummynet.DaemonExitError):
+            while process_monitor.run():
+                pass
+
+    finally:
+
+        # Close any running async commands
+        process_monitor.stop()
+
+
+def test_all_daemons():
+
+    log = logging.getLogger("dummynet")
+    log.setLevel(logging.DEBUG)
+    log.addHandler(logging.StreamHandler())
+
+    # Create a process monitor
+    process_monitor = ProcessMonitor()
+
+    # The host shell used if we don't have a recording
+    shell = HostShell(log=log, sudo=True, process_monitor=process_monitor)
+
+    try:
+
+        # Run two commands on the host where the daemon will exit
+        # before the non-daemon command
+        shell.run_async(cmd="ping -c 5 8.8.8.8", daemon=True)
+        shell.run_async(cmd="ping -c 50 8.8.8.8", daemon=True)
+
+        with pytest.raises(dummynet.AllDaemonsError):
+            while process_monitor.run():
+                pass
+
+    finally:
+
+        # Close any running async commands
+        process_monitor.stop()
+
+
+def test_no_processes():
+
+    log = logging.getLogger("dummynet")
+    log.setLevel(logging.DEBUG)
+    log.addHandler(logging.StreamHandler())
+
+    # Create a process monitor
+    process_monitor = ProcessMonitor()
+
+    try:
+
+        with pytest.raises(dummynet.NoProcessesError):
+            while process_monitor.run():
+                pass
+
+    finally:
+
+        # Close any running async commands
+        process_monitor.stop()
+
+
+def test_pendingresult():
+
+    log = logging.getLogger("dummynet")
+    log.setLevel(logging.DEBUG)
+    log.addHandler(logging.StreamHandler())
+
+    # Create a process monitor
+    process_monitor = ProcessMonitor()
+
+    # The host shell used if we don't have a recording
+    shell = HostShell(log=log, sudo=True, process_monitor=process_monitor)
+
+    # DummyNet wrapper that will prevent clean up from happening in playback
+    # mode if an exception occurs
+    net = DummyNet(shell=shell)
+
+    try:
+
+        # Run a command on the host
+        out = net.run_async(cmd="ping -c 5 8.8.8.8")
+
+        while process_monitor.run():
+            pass
+
+        out.result.match(stdout="5 packets transmitted*", stderr=None)
+
+    finally:
+
+        # Clean up.
+        net.cleanup()
+
+        # Close any running async commands
+        process_monitor.stop()
+
+
+def test_process_still_running():
+
+    log = logging.getLogger("dummynet")
+    log.setLevel(logging.DEBUG)
+    log.addHandler(logging.StreamHandler())
+
+    # Create a process monitor
+    process_monitor = ProcessMonitor()
+
+    # The host shell used if we don't have a recording
+    shell = HostShell(log=log, sudo=True, process_monitor=process_monitor)
+
+    # DummyNet wrapper that will prevent clean up from happening in playback
+    # mode if an exception occurs
+    net = DummyNet(shell=shell)
+
+    try:
+
+        # Run a command on the host
+        out = net.run_async(cmd="ping -c 50 8.8.8.8")
+
+        with pytest.raises(dummynet.ProcessRunningError):
+            while process_monitor.run():
+                out.result.match(stdout="5 packets transmitted*", stderr=None)
+
+    finally:
+
+        # Close any running async commands
+        process_monitor.stop()

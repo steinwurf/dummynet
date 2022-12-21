@@ -1,55 +1,35 @@
 import select
 import textwrap
 
+from . import errors
+from . import process
 
-class TestMonitor:
+
+class ProcessMonitor:
     """
-    The basic idea behind the monitor is to coordinate a test execution.
+    The basic idea behind the monitor is to coordinate a process execution.
 
     Typically scenario:
 
-    1. Run tunneling software to create a tunnel between two hosts
-    2. Start some application to send data over the tunnel.
-    3. Stop the test once the application started in step 2 is done.
+    1. Run measurement software between two hosts
+    2. Start a server side waiting for clients to connect
+    3. Start a client and stop test once client exits
 
-    We should also ensure that the applications started in 1 keeps
-    running throughout the test.
+    We should also ensure that the server applications started in 2 keeps
+    running throughout the test and that it is closed when the client
+    application exits.
     """
-
-    class Process(object):
-        def __init__(self, process, cmd, cwd, daemon):
-            self.process = process
-            self.cmd = cmd
-            self.cwd = cwd
-            self.daemon = daemon
-
-        def __str__(self):
-            run_string = """
-                Process
-                cmd:
-                {cmd}
-                cwd:
-                {cwd}
-                stdout:
-                {stdout}
-                stderr:
-                {stderr}
-                returncode:
-                {returncode}
-                daemon:
-                {daemon}"""
-            return textwrap.dedent(run_string).format(
-                cmd=self.cmd,
-                cwd=self.cwd,
-                stdout=self.process.stdout.read(),
-                stderr=self.process.stderr.read(),
-                returncode=self.process.returncode,
-                daemon=self.daemon,
-            )
 
     def __init__(self):
         """Create a new test monitor"""
+
+        # A dictionary of running processes
         self.running = {}
+
+        # List of died processes
+        self.died = []
+
+        # The poller is used to wait for processes to terminate
         self.poller = select.poll()
 
     def __enter__(self):
@@ -57,56 +37,51 @@ class TestMonitor:
 
     def stop(self):
         for fd in self.running:
-            process = self.running[fd].process
-            process.poll()
-            if process.returncode:
+            popen = self.running[fd].popen
+            popen.poll()
+            if popen.returncode:
                 raise RuntimeError(
                     "Process exited with error {}".format(self.running[fd])
                 )
-            process.terminate()
-            process.wait()
+            popen.terminate()
+            popen.wait()
 
             self.poller.unregister(fd)
 
         self.running = {}
+        self.died = []
 
     def __exit__(self, type, value, traceback):
         self.stop()
 
-    def add_process(self, process, cmd, cwd, daemon=False):
+    def add_process(self, process):
         """Add a process to the monitor.
 
-        :param process: The process
-        :param cmd: The arguments used to start the process
-        :param cwd: The current working directory where the
-            process was launched.
-        :param daemon: If True the process is a daemon. Daemons will
-            not keep the test monitor running, but are expected to
-            run to the end of the test.
+        :param process: The process to add to the monitor (a
+            dummy.process.Process object)
         """
 
         # Make sure the process is running
-        process.poll()
+        process.popen.poll()
 
         # The returncode should be None if the process is running
-        if not process.returncode is None:
+        if not process.popen.returncode is None:
             raise RuntimeError(
                 "Process not running: "
                 "returncode={} stderr={}".format(
-                    process.returncode, process.stderr.read()
+                    process.popen.returncode, process.popen.stderr.read()
                 )
             )
         # Get the file descriptor
-        fd = process.stdout.fileno()
+        fd = process.popen.stdout.fileno()
 
         # Make sure we get signals when the process terminates
         self.poller.register(fd, select.POLLHUP | select.POLLERR)
-        self.running[fd] = TestMonitor.Process(
-            process=process, cmd=cmd, cwd=cwd, daemon=daemon
-        )
+
+        self.running[fd] = process
 
     def run(self, timeout=500):
-        """Run the TestMonitor.
+        """Run the process monitor.
 
         :param timeout: A timeout in milliseconds. If this timeout
             expires we return.
@@ -121,6 +96,8 @@ class TestMonitor:
                     pass
         """
 
+        self._check_state()
+
         while self._keep_running():
             fds = self.poller.poll(timeout)
 
@@ -133,6 +110,24 @@ class TestMonitor:
                 self._died(fd=fd, event=event)
 
         return False
+
+    def _check_state(self):
+        """Check that the state is valid."""
+
+        if not self.running and not self.died:
+            # No processes in running or died
+            raise errors.NoProcessesError()
+
+        # Check that we have non daemon processes
+        for process in self.running.values():
+            if not process.is_daemon:
+                return
+
+        for process in self.died:
+            if not process.is_daemon:
+                return
+
+        raise errors.AllDaemonsError()
 
     def _died(self, fd, event):
         """A process has died.
@@ -154,19 +149,21 @@ class TestMonitor:
         del self.running[fd]
 
         # Update the return code
-        died.process.wait()
+        died.popen.wait()
+
+        self.died.append(died)
 
         # Check if we had a normal exit
-        if died.process.returncode:
+        if died.popen.returncode:
 
             # The process had a non-zero return code
             raise RuntimeError("Unexpected exit {}".format(died))
 
-        if died.daemon:
+        if died.is_daemon:
 
             # The process was a daemon - these should not exit
             # until after the test is over
-            raise RuntimeError("Unexpected daemon exit {}".format(died))
+            raise errors.DaemonExitError(died)
 
     def _keep_running(self):
         """Check if the test is over.
@@ -176,7 +173,7 @@ class TestMonitor:
         """
 
         for process in self.running.values():
-            if not process.daemon:
+            if not process.is_daemon:
                 # A process which is not a daemon is still running
                 return True
 
