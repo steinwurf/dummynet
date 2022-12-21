@@ -12,11 +12,12 @@ class HostShell(object):
 
     def __init__(self, log, sudo: bool, process_monitor):
         """Create a new HostShell object
+
         :param log: The logger to use
         :param sudo: Whether to run commands with sudo
-        :param testmonitor: The test monitor to use. The test monitor is used
-            to track running processes and to stop them when the test is
-            finished.
+        :param process_monitor: The monitor is used
+                                to track running processes and to stop them when the test is
+                                finished.
         """
         self.log = log
         self.sudo = sudo
@@ -24,9 +25,10 @@ class HostShell(object):
 
     def run(self, cmd: str, cwd=None):
         """Run a synchronous command (blocking).
+
         :param cmd: The command to run
         :param cwd: The current working directory i.e. where the command will
-            run
+                    run
         """
 
         if self.sudo:
@@ -68,9 +70,10 @@ class HostShell(object):
 
     def run_async(self, cmd: str, daemon=False, cwd=None):
         """Run an asynchronous command (non-blocking).
+
         :param cmd: The command to run
         :param cwd: The current working directory i.e. where the command will
-            run
+                    run
         """
         if self.sudo:
             cmd = "sudo " + cmd

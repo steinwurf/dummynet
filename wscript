@@ -126,18 +126,14 @@ def _create_venv(ctx, location):
 def docs(ctx):
     """Build the documentation"""
 
-    with ctx.create_virtualenv() as venv:
-        if not os.path.isfile("docs/requirements.txt"):
-            venv.run("python -m pip install pip-tools")
-            venv.run("pip-compile docs/requirements.in")
+    ctx.pip_compile(
+        requirements_in="docs/requirements.in", requirements_txt="docs/requirements.txt"
+    )
 
+    with ctx.create_virtualenv() as venv:
         venv.run("python -m pip install -r docs/requirements.txt")
         build_path = os.path.join(ctx.path.abspath(), "build", "docs")
-
-    venv.run(f"giit clean . --build_path {build_path}", cwd=ctx.path.abspath())
-    arguments = []
-    arguments.append(f"--build_path {build_path}")
-    venv.run("giit sphinx . {}".format(" ".join(arguments)), cwd=ctx.path.abspath())
+        venv.run(f"sphinx-build -b html docs {build_path}")
 
 
 def _pytest(bld):

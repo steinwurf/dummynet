@@ -4,7 +4,16 @@ from . import namespace_shell
 
 
 class DummyNet(object):
+
+    """A DummyNet object is used to create a network of virtual ethernet
+    devices and bind them to namespaces.
+    """
+
     def __init__(self, shell):
+        """Creates a new DummyNet object.
+
+        :param shell: The shell to use for running commands
+        """
         self.shell = shell
         self.cleaners = []
 
@@ -12,7 +21,11 @@ class DummyNet(object):
         """Adds a virtual ethernet between two endpoints.
 
         Name of the link will be 'p1_name@p2_name' when you look at 'ip addr'
-        in the terminal"""
+        in the terminal
+
+        :param p1_name: Name of the first endpoint
+        :param p2_name: Name of the second endpoint
+        """
 
         self.shell.run(
             cmd=f"ip link add {p1_name} type veth peer name {p2_name}", cwd=None
@@ -21,13 +34,21 @@ class DummyNet(object):
     def link_set(self, namespace, interface):
         """Binds a network interface (usually the veths) to a namespace.
 
-        The namespace parameter is the name of the namespace as a string"""
+        The namespace parameter is the name of the namespace as a string
+
+        :param namespace: The namespace to bind the interface to
+        :param interface: The interface to bind to the namespace
+        """
 
         self.shell.run(cmd=f"ip link set {interface} netns {namespace}", cwd=None)
 
     def link_list(self, link_type=None):
         """Returns the output of the 'ip link list' command parsed to a
-        list of strings"""
+        list of strings
+
+        :param link_type: The type of link to list (e.g. veth or bridge)
+        :return: A list of strings with the names of the links
+        """
 
         cmd = "ip link list"
 
@@ -87,7 +108,7 @@ class DummyNet(object):
 
         :param cmd: The command to run
         :param cwd: The working directory to run the command in
-        :return: A dummynet.RunResult object
+        :return: A :ref:`dummynetrunresult` object
         """
 
         return self.shell.run(cmd=cmd, cwd=cwd)
@@ -98,7 +119,7 @@ class DummyNet(object):
         :param cmd: The command to run
         :param daemon: Whether to run the command as a daemon
         :param cwd: The working directory to run the command in
-        :return: A dummynet.Process object
+        :return: A :ref:`dummynetprocess` object
         """
 
         return self.shell.run_async(cmd=cmd, daemon=daemon, cwd=cwd)
@@ -131,7 +152,7 @@ class DummyNet(object):
 
         output = self.tc_show(interface=interface, cwd=cwd)
 
-        if "netem" in output:
+        if "netem" in output.stdout:
             action = "change"
 
         else:

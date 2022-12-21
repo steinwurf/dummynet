@@ -2,6 +2,10 @@ import json
 import pathlib
 
 
+class MockShellError(Exception):
+    pass
+
+
 class MockShell:
     class Record:
         def __init__(self):
@@ -12,33 +16,18 @@ class MockShell:
             self.recording = recording
             self.shell = shell
             self.calls = []
-            self.in_error = False
 
         def close(self):
-
-            if self.in_error:
-                # If we  have an exception, don't save the recording
-                return
+            """Write the calls to the recording file"""
 
             with open(self.recording, "w") as f:
                 json.dump(self.calls, f, indent=4)
 
         def run(self, cmd: str, cwd=None, detach=False):
 
-            if self.in_error:
-                # We already have an error, don't record any more calls. We
-                # just pass commands to the host shell to allow cleanup to
-                # happen
-                return self.shell.run(cmd=cmd, cwd=cwd, detach=detach)
-
             # Run the command and record the output
-            try:
-                run = f"run(cmd={cmd}, cwd={cwd}, detach={detach})"
-                out = self.shell.run(cmd=cmd, cwd=cwd, detach=detach)
-
-            except Exception as e:
-                self.in_error = True
-                raise e
+            run = f"run(cmd={cmd}, cwd={cwd}, detach={detach})"
+            out = self.shell.run(cmd=cmd, cwd=cwd, detach=detach)
 
             self.calls.append({"run": run, "out": out})
             return out
@@ -51,31 +40,21 @@ class MockShell:
             with open(recording, "r") as f:
                 self.calls = json.load(f)
 
-            self.in_error = False
-
         def close(self):
 
-            if not self.in_error:
-                # If we didn't have an error, we should have used all the
-                # calls
-                assert self.calls == []
+            if self.calls != []:
+                raise MockShellError(f"Unused calls: {self.calls}")
 
         def run(self, cmd: str, cwd=None, detach=False):
 
-            if self.in_error:
-                # We already have an error, don't check any more calls.
-                return
-
             if len(self.calls) == 0:
-                self.in_error = True
-                raise Exception(f"No more calls in recording")
+                raise MockShellError(f"No more calls in recording")
 
             call = self.calls.pop(0)
             run = f"run(cmd={cmd}, cwd={cwd}, detach={detach})"
 
             if run != call["run"]:
-                self.in_error = True
-                raise Exception(f"Expected {run} but got {call['run']}")
+                raise MockShellError(f"Expected {run} but got {call['run']}")
 
             return call["out"]
 
@@ -96,8 +75,8 @@ class MockShell:
         self.mode.close()
         self.mode = None
 
-    def run(self, cmd: str, cwd=None, detach=False):
-        return self.mode.run(cmd=cmd, cwd=cwd, detach=detach)
+    def run(self, cmd, cwd=None):
+        return self.mode.run(cmd=cmd, cwd=cwd)
 
-    def run_async(self, cmd: str, daemon=False, delay=0, cwd=None):
-        assert False
+    def run_async(self, cmd, daemon=False, cwd=None):
+        assert False, "Mock shell doesn't support async commands"

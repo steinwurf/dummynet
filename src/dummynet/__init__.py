@@ -5,6 +5,8 @@ from .host_shell import HostShell
 from .tcpdump import TCPDumpCommand
 from .tshark import TSharkCommand, TSharkOutputFormat
 from .process_monitor import ProcessMonitor
+from .process import Process
+from .run_result import RunResult
 
 from .errors import DummyNetError
 from .errors import RunResultError

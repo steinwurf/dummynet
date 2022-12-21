@@ -11,16 +11,16 @@ import pytest
 import mockshell
 
 
-def _test_run():
+def test_run():
 
     log = logging.getLogger("dummynet")
 
     # The host shell used if we don't have a recording
-    host_shell = HostShell(log=log, sudo=True)
+    shell = HostShell(log=log, sudo=True, process_monitor=None)
 
     # Create a mock shell which will receive the calls performed by the DummyNet
-    shell = mockshell.MockShell()
-    shell.open(recording="test/data/calls.json", shell=host_shell)
+    # shell = mockshell.MockShell()
+    # shell.open(recording="test/data/calls.json", shell=host_shell)
 
     # DummyNet wrapper that will prevent clean up from happening in playback
     # mode if an exception occurs
@@ -78,16 +78,12 @@ def _test_run():
         demo1.tc_show(interface="demo1-eth0")
 
         out = demo0.run(cmd="ping -c 10 10.0.0.2")
-
-        print(out)
+        out.match(stdout="10 packets transmitted*", stderr=None)
 
     finally:
 
         # Clean up.
         net.cleanup()
-
-        # Close the mock shell
-        shell.close()
 
 
 def test_with_timeout():
