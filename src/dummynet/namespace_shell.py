@@ -1,4 +1,4 @@
-class NamespaceShell(object):
+class NamespaceShell:
     def __init__(self, name, shell):
         self.name = name
         self.shell = shell
@@ -12,13 +12,13 @@ class NamespaceShell(object):
 
         return self.shell.run(cmd=f"ip netns exec {self.name} {cmd}", cwd=cwd)
 
-    async def run_async(self, cmd, daemon=False, cwd=None):
+    def run_async(self, cmd, daemon=False, cwd=None):
         """Run a command in a shell asynchronously.
         :param cmd: The command to run
         :param cwd: The current working directory i.e. where the command will
             run
         """
 
-        await self.shell.run_async(
+        return self.shell.run_async(
             cmd=f"ip netns exec {self.name} {cmd}", daemon=daemon, cwd=cwd
         )
