@@ -2,7 +2,6 @@ import subprocess
 import time
 
 from . import run_result
-from . import pending_result
 from . import errors
 from . import process
 
