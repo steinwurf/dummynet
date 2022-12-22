@@ -1,9 +1,6 @@
 from .dummy_net import DummyNet
 from .namespace_shell import NamespaceShell
-from .docker_shell import DockerShell
 from .host_shell import HostShell
-from .tcpdump import TCPDumpCommand
-from .tshark import TSharkCommand, TSharkOutputFormat
 from .process_monitor import ProcessMonitor
 from .process import Process
 from .run_result import RunResult

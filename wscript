@@ -54,7 +54,7 @@ def build(bld):
     # Delete the egg-info directory, do not understand why this is created
     # when we build a wheel. But, it is - perhaps in the future there will
     # be some way to disable its creation.
-    egg_info = os.path.join("src", "dummynet.egg-info")
+    egg_info = os.path.abspath(os.path.join("src", "dummynet.egg-info"))
 
     if os.path.isdir(egg_info):
         waflib.extras.wurf.directory.remove_directory(path=egg_info)

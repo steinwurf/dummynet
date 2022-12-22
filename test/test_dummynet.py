@@ -8,8 +8,6 @@ import logging
 import time
 import pytest
 
-import mockshell
-
 
 def test_run():
 
