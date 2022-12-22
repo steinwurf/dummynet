@@ -43,7 +43,7 @@ class ProcessMonitor:
                 raise RuntimeError(
                     "Process exited with error {}".format(self.running[fd])
                 )
-            popen.terminate()
+            popen.kill()
             popen.wait()
 
             self.poller.unregister(fd)
