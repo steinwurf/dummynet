@@ -14,7 +14,7 @@ def test_run():
 
     log = logging.getLogger("dummynet")
 
-    sudo = True if os.geteuid() == 0 else False
+    sudo = False if os.geteuid() == 0 else True
 
     # The host shell used if we don't have a recording
     shell = HostShell(log=log, sudo=sudo, process_monitor=None)
@@ -91,7 +91,7 @@ def test_run_async():
 
     log = logging.getLogger("dummynet")
 
-    sudo = True if os.geteuid() == 0 else False
+    sudo = False if os.geteuid() == 0 else True
 
     process_monitor = ProcessMonitor()
 
@@ -189,7 +189,7 @@ def test_daemon_exit():
     log.setLevel(logging.DEBUG)
     log.addHandler(logging.StreamHandler())
 
-    sudo = True if os.geteuid() == 0 else False
+    sudo = False if os.geteuid() == 0 else True
 
     # Create a process monitor
     process_monitor = ProcessMonitor()
@@ -220,7 +220,7 @@ def test_all_daemons():
     log.setLevel(logging.DEBUG)
     log.addHandler(logging.StreamHandler())
 
-    sudo = True if os.geteuid() == 0 else False
+    sudo = False if os.geteuid() == 0 else True
 
     # Create a process monitor
     process_monitor = ProcessMonitor()
@@ -275,7 +275,7 @@ def test_pendingresult():
     # Create a process monitor
     process_monitor = ProcessMonitor()
 
-    sudo = True if os.geteuid() == 0 else False
+    sudo = False if os.geteuid() == 0 else True
 
     # The host shell used if we don't have a recording
     shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
@@ -312,7 +312,7 @@ def test_process_still_running():
     # Create a process monitor
     process_monitor = ProcessMonitor()
 
-    sudo = True if os.geteuid() == 0 else False
+    sudo = False if os.geteuid() == 0 else True
 
     # The host shell used if we don't have a recording
     shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
