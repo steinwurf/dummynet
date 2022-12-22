@@ -49,7 +49,7 @@ setup(
     version=VERSION,
     description=("A tool for creating dummy networks using network namespaces."),
     long_description=long_description,
-    long_description_content_type='text/x-rst',
+    long_description_content_type="text/x-rst",
     url="https://github.com/steinwurf/dummynet-python",
     author="Steinwurf ApS",
     author_email="contact@steinwurf.com",
