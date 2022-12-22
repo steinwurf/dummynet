@@ -7,14 +7,17 @@ import dummynet
 import logging
 import time
 import pytest
+import os
 
 
 def test_run():
 
     log = logging.getLogger("dummynet")
 
+    sudo = True if os.geteuid() == 0 else False
+
     # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=True, process_monitor=None)
+    shell = HostShell(log=log, sudo=sudo, process_monitor=None)
 
     # Create a mock shell which will receive the calls performed by the DummyNet
     # shell = mockshell.MockShell()
@@ -88,9 +91,11 @@ def test_run_async():
 
     log = logging.getLogger("dummynet")
 
+    sudo = True if os.geteuid() == 0 else False
+
     process_monitor = ProcessMonitor()
 
-    shell = HostShell(log=log, sudo=True, process_monitor=process_monitor)
+    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
 
     net = DummyNet(shell=shell)
 
@@ -184,11 +189,13 @@ def test_daemon_exit():
     log.setLevel(logging.DEBUG)
     log.addHandler(logging.StreamHandler())
 
+    sudo = True if os.geteuid() == 0 else False
+
     # Create a process monitor
     process_monitor = ProcessMonitor()
 
     # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=True, process_monitor=process_monitor)
+    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
 
     try:
 
@@ -213,11 +220,13 @@ def test_all_daemons():
     log.setLevel(logging.DEBUG)
     log.addHandler(logging.StreamHandler())
 
+    sudo = True if os.geteuid() == 0 else False
+
     # Create a process monitor
     process_monitor = ProcessMonitor()
 
     # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=True, process_monitor=process_monitor)
+    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
 
     try:
 
@@ -266,8 +275,10 @@ def test_pendingresult():
     # Create a process monitor
     process_monitor = ProcessMonitor()
 
+    sudo = True if os.geteuid() == 0 else False
+
     # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=True, process_monitor=process_monitor)
+    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
 
     # DummyNet wrapper that will prevent clean up from happening in playback
     # mode if an exception occurs
@@ -301,8 +312,10 @@ def test_process_still_running():
     # Create a process monitor
     process_monitor = ProcessMonitor()
 
+    sudo = True if os.geteuid() == 0 else False
+
     # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=True, process_monitor=process_monitor)
+    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
 
     # DummyNet wrapper that will prevent clean up from happening in playback
     # mode if an exception occurs
@@ -321,3 +334,6 @@ def test_process_still_running():
 
         # Close any running async commands
         process_monitor.stop()
+
+        # Clean up.
+        net.cleanup()
