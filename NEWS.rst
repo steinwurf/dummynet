@@ -1,11 +1,11 @@
-News for dummynet-python
-========================
+News for dummynet
+=================
 This file lists the major changes between versions. For a more detailed list of
 every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Major: Rewrite of dummynet to add support for managing multiple processes.
 
 1.0.2
 -----
