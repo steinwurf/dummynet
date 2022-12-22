@@ -1,5 +1,5 @@
-``class dummynet.DummyNet``
----------------------------
+``dummynet.DummyNet``
+---------------------
 
 .. autoclass:: dummynet.DummyNet
     :members:

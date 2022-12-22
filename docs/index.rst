@@ -47,6 +47,7 @@ Light weight network testing tool::
 
 .. toctree::
    :maxdepth: 2
+   :hidden:
 
    api/api
 

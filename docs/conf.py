@@ -46,4 +46,5 @@ html_theme_options = {
     "github_user": "steinwurf",
     "github_repo": "dummynet",
     "fixed_sidebar": True,
+    "sidebar_collapse": False,
 }

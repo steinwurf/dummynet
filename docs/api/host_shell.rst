@@ -1,5 +1,5 @@
-``class dummynet.HostShell``
-----------------------------
+``dummynet.HostShell``
+----------------------
 
 .. autoclass:: dummynet.HostShell
     :members:

@@ -116,6 +116,9 @@ class DummyNet(object):
     def run_async(self, cmd, daemon=False, cwd=None):
         """Wrapper for the concurrent command-line access
 
+        Asynchronous commands run in the background. The process is launched via
+        the shell.
+
         :param cmd: The command to run
         :param daemon: Whether to run the command as a daemon
         :param cwd: The working directory to run the command in
@@ -235,12 +238,13 @@ class DummyNet(object):
     def netns_delete(self, name):
         """Deletes a specific network namespace.
         Note that before deleting a network namespace all processes in that
-        namespace should be killed. Using e.g.
+        namespace should be killed. Using e.g.::
 
-        process_list = shell.netns_get_process_list(ns_name).splitlines()
-        for process in process_list:
-            self.netns_kill_process(name, process)
+            process_list = net.netns_get_process_list(ns_name).splitlines()
+            for process in process_list:
+                self.netns_kill_process(name, process)
 
+        :param name: Name of the namespace to delete
         """
 
         self.shell.run(cmd=f"ip netns delete {name}", cwd=None)

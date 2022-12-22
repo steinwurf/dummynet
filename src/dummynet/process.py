@@ -5,7 +5,25 @@ from . import errors
 
 
 class Process(object):
+    """Process object to track the state of a process
+
+    :ivar popen: The subprocess.Popen object
+    :ivar cmd: The command that was run
+    :ivar cwd: The working directory that the command was run in
+    :ivar is_daemon: Whether the process is a daemon
+    :ivar is_async: Whether the process is asynchronous
+    :ivar result: The :ref:`dummynetrunresult` object
+    """
+
     def __init__(self, popen, cmd, cwd, is_daemon, is_async):
+        """ " Construct a new process object.
+
+        :param popen: The subprocess.Popen object
+        :param cmd: The command that was run
+        :param cwd: The working directory that the command was run in
+        :param is_daemon: Whether the process is a daemon
+        :param is_async: Whether the process is asynchronous
+        """
         self.popen = popen
         self.cmd = cmd
         self.cwd = cwd

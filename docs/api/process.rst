@@ -1,7 +1,9 @@
 .. _dummynetprocess:
 
-``class dummynet.Process``
+``dummynet.Process``
 --------------------------
 
 .. autoclass:: dummynet.Process
     :members:
+    :special-members: __init__
+
