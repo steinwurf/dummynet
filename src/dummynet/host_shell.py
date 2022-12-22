@@ -1,76 +1,111 @@
 import subprocess
-import asyncio
+import time
+
+from . import run_result
+from . import errors
+from . import process
 
 
 class HostShell(object):
     """A shell object for running commands"""
 
-    def __init__(self, log, sudo: bool):
+    def __init__(self, log, sudo: bool, process_monitor):
+        """Create a new HostShell object
+
+        :param log: The logger to use
+        :param sudo: Whether to run commands with sudo
+        :param process_monitor: The monitor is used
+                                to track running processes and to stop them when the test is
+                                finished.
+        """
         self.log = log
         self.sudo = sudo
+        self.process_monitor = process_monitor
 
     def run(self, cmd: str, cwd=None):
-        """Run a command.
+        """Run a synchronous command (blocking).
+
         :param cmd: The command to run
         :param cwd: The current working directory i.e. where the command will
-            run
+                    run
         """
 
         if self.sudo:
             cmd = "sudo " + cmd
 
         self.log.debug(cmd)
-        return subprocess.check_output(
+
+        # Launch the command
+        process = subprocess.Popen(
             cmd,
-            shell=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=cwd,
+            shell=True,
+            # Get stdout and stderr as text
             text=True,
         )
 
-    async def run_async(self, cmd: str, daemon=False, delay=0, cwd=None):
-        """Run an asynchronous command.
+        # Here we wait for the process to exit
+        # Warning: this can fail with large numbers of fds!
+        stdout, stderr = process.communicate()
+        returncode = process.wait()
+
+        result = run_result.RunResult(
+            cmd=cmd,
+            cwd=cwd,
+            stdout=stdout,
+            stderr=stderr,
+            returncode=returncode,
+            is_async=False,
+            is_daemon=False,
+        )
+
+        if result.returncode != 0:
+            raise errors.RunResultError(result=result)
+
+        return result
+
+    def run_async(self, cmd: str, daemon=False, cwd=None):
+        """Run an asynchronous command (non-blocking).
+
         :param cmd: The command to run
         :param cwd: The current working directory i.e. where the command will
-            run
+                    run
         """
-        task = asyncio.current_task()
-        task.cmd = cmd
-        task.daemon = daemon
-
-        if delay > 0:
-            self.log.debug(f"Waiting {delay} seconds")
-            await asyncio.sleep(delay)
-
         if self.sudo:
             cmd = "sudo " + cmd
 
-        self.log.debug("Running " + cmd)
+        self.log.debug(cmd)
 
-        proc = await asyncio.create_subprocess_shell(
-            cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=cwd
+        # Launch the command
+        popen = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=cwd,
+            shell=True,
+            # Get stdout and stderr as text
+            text=True,
         )
 
-        self.log.debug("Launched")
+        running = process.Process(
+            popen=popen,
+            cmd=cmd,
+            cwd=cwd,
+            is_async=True,
+            is_daemon=daemon,
+        )
 
-        try:
-            stdout, stderr = await proc.communicate()
-        except asyncio.exceptions.CancelledError:
-            if daemon:
-                self.log.debug("Deamon shutting down")
-            else:
-                raise
+        self.process_monitor.add_process(
+            process=running,
+        )
 
-        else:
+        # If we are launching a daemon we wait 0.5 sec for
+        # it to launch
+        if daemon:
+            time.sleep(0.5)
 
-            self.log.debug(f"[{cmd!r} exited with {proc.returncode}]")
-            if stdout:
-                self.log.info(f"[stdout]\n{stdout.decode()}")
-            if stderr:
-                self.log.info(f"[stderr]\n{stderr.decode()}")
-
-            if daemon:
-                raise RuntimeError("Deamon exit prematurely")
-
-            if proc.returncode != 0:
-                raise RuntimeError(f"{cmd} failed with exit code {proc.returncode}")
+        return running

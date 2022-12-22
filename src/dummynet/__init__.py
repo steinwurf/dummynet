@@ -1,5 +1,14 @@
 from .dummy_net import DummyNet
-from .dummy_net_factory import DummyNetFactory
 from .namespace_shell import NamespaceShell
-from .docker_shell import DockerShell
 from .host_shell import HostShell
+from .process_monitor import ProcessMonitor
+from .process import Process
+from .run_result import RunResult
+
+from .errors import DummyNetError
+from .errors import RunResultError
+from .errors import MatchError
+from .errors import DaemonExitError
+from .errors import AllDaemonsError
+from .errors import NoProcessesError
+from .errors import ProcessRunningError

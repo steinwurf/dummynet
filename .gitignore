@@ -5,3 +5,6 @@ coverage
 .waf*
 .lock*
 .pytest_cache
+venv-test
+test-venv
+.vscode
