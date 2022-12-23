@@ -34,6 +34,24 @@ class RunResult:
         self.returncode = returncode
         self.is_async = is_async
         self.is_daemon = is_daemon
+        self.stdout_callback = None
+
+    def on_stdout(self, callback):
+        """Apply a callback to each line of stdout
+
+        :param callback: The callback to apply to each line of stdout
+        """
+        self.stdout_callback = callback
+
+    def append_stdout(self, data):
+        """Append a data to stdout
+
+        :param data: The data to append
+        """
+        if self.stdout_callback is not None:
+            self.stdout_callback(data)
+
+        self.stdout += data
 
     def match(self, stdout=None, stderr=None):
         """Matches the lines in the output with the pattern. The match

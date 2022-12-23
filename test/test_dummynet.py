@@ -10,7 +10,7 @@ import pytest
 import os
 
 
-def test_run():
+def _test_run():
 
     log = logging.getLogger("dummynet")
 
@@ -128,10 +128,8 @@ def test_run_async():
         proc0 = demo0.run_async(cmd="ping -c 10 10.0.0.2")
         proc1 = demo1.run_async(cmd="ping -c 10 10.0.0.1")
 
-        # process_monitor.add_process(proc0)
-        # process_monitor.add_process(proc1)
-
         while process_monitor.run():
+            print(proc0.stdout)
             pass
 
         proc0.result.match(stdout="10 packets transmitted*", stderr=None)
@@ -143,7 +141,7 @@ def test_run_async():
         net.cleanup()
 
 
-def test_with_timeout():
+def _test_with_timeout():
 
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
@@ -183,7 +181,7 @@ def test_with_timeout():
         process_monitor.stop()
 
 
-def test_daemon_exit():
+def _test_daemon_exit():
 
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
@@ -214,7 +212,7 @@ def test_daemon_exit():
         process_monitor.stop()
 
 
-def test_all_daemons():
+def _test_all_daemons():
 
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
@@ -245,7 +243,7 @@ def test_all_daemons():
         process_monitor.stop()
 
 
-def test_no_processes():
+def _test_no_processes():
 
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
@@ -266,7 +264,7 @@ def test_no_processes():
         process_monitor.stop()
 
 
-def test_pendingresult():
+def _test_pendingresult():
 
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
@@ -303,7 +301,7 @@ def test_pendingresult():
         process_monitor.stop()
 
 
-def test_process_still_running():
+def _test_process_still_running():
 
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)

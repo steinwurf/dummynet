@@ -91,21 +91,16 @@ class HostShell(object):
             text=True,
         )
 
-        running = process.Process(
-            popen=popen,
+        result = run_result.RunResult(
             cmd=cmd,
             cwd=cwd,
+            stdout="",
+            stderr="",
+            returncode=None,
             is_async=True,
             is_daemon=daemon,
         )
 
-        self.process_monitor.add_process(
-            process=running,
-        )
+        self.process_monitor.add_process(popen, result)
 
-        # If we are launching a daemon we wait 0.5 sec for
-        # it to launch
-        if daemon:
-            time.sleep(0.5)
-
-        return running
+        return result
