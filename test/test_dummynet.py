@@ -90,10 +90,11 @@ def _test_run():
 def test_run_async():
 
     log = logging.getLogger("dummynet")
+    log.setLevel(logging.DEBUG)
 
     sudo = False if os.geteuid() == 0 else True
 
-    process_monitor = ProcessMonitor()
+    process_monitor = ProcessMonitor(log=log)
 
     shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
 

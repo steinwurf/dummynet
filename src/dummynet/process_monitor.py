@@ -21,8 +21,9 @@ class ProcessMonitor:
     """
 
     class Poller:
-        def __init__(self):
+        def __init__(self, log):
             self.poller = select.poll()
+            self.log = log
 
         def register(self, process):
 
@@ -36,10 +37,14 @@ class ProcessMonitor:
                 select.POLLIN,
             )
 
+            self.log.debug("Registered process {}".format(process))
+
         def unregister(self, process):
 
             self.poller.unregister(process.popen.stdout.fileno())
             self.poller.unregister(process.popen.stderr.fileno())
+
+            self.log.debug("Unregistered process {}".format(process))
 
         def poll(self, timeout):
             return self.poller.poll(timeout)
@@ -47,15 +52,17 @@ class ProcessMonitor:
     class Process:
         """A process object to track the state of a process"""
 
-        def __init__(self, popen, result):
+        def __init__(self, popen, result, log):
             """Construct a new process object.
 
             :param popen: The subprocess.Popen object
             :param result: The dummynet.RunResult object
+            :param log: The log object
             """
 
             self.popen = popen
             self.result = result
+            self.log = log
 
         def has_fd(self, fd):
             """Check if the process has a file descriptor.
@@ -96,7 +103,7 @@ class ProcessMonitor:
                 )
             )
 
-    def __init__(self):
+    def __init__(self, log):
         """Create a new test monitor"""
 
         # A dictionary of running processes
@@ -106,7 +113,10 @@ class ProcessMonitor:
         self.died = []
 
         # The poller is used to wait for processes to terminate
-        self.poller = ProcessMonitor.Poller()
+        self.poller = ProcessMonitor.Poller(log=log)
+
+        # The log object
+        self.log = log
 
     def __enter__(self):
         pass
@@ -145,7 +155,7 @@ class ProcessMonitor:
                 "returncode={} stderr={}".format(popen.returncode, popen.stderr.read())
             )
         # Get the file descriptor
-        process = ProcessMonitor.Process(popen, result)
+        process = ProcessMonitor.Process(popen, result, log=self.log)
 
         self.poller.register(process)
 
@@ -223,7 +233,7 @@ class ProcessMonitor:
             if process.has_fd(fd):
                 return process
 
-        raise RuntimeError("Unknown process")
+        raise RuntimeError(f"Unknown process for fd {fd}")
 
     def _read(self, fd):
         """A process has written data.
