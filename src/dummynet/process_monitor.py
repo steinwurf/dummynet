@@ -37,14 +37,14 @@ class ProcessMonitor:
                 select.POLLIN,
             )
 
-            self.log.debug("Registered process {}".format(process))
+            self.log.debug(f"Register process {process}")
 
         def unregister(self, process):
 
             self.poller.unregister(process.popen.stdout.fileno())
             self.poller.unregister(process.popen.stderr.fileno())
 
-            self.log.debug("Unregistered process {}".format(process))
+            self.log.debug(f"Unregister process {process}")
 
         def poll(self, timeout):
             return self.poller.poll(timeout)
@@ -94,13 +94,13 @@ class ProcessMonitor:
 
         def __str__(self):
             return textwrap.dedent(
-                """\
+                f"""\
                 Process:
-                    popen: {}
-                    result: {}
-                """.format(
-                    self.popen, self.result
-                )
+                    popen.pid: {self.popen.pid}
+                    popen.stdout: {self.popen.stdout.fileno()}
+                    popen.stderr: {self.popen.stderr.fileno()}
+                    result: {self.result}
+                """
             )
 
     def __init__(self, log):
@@ -186,10 +186,10 @@ class ProcessMonitor:
                 # We got a timeout
                 return True
 
-            print(f"on fds: {fds}")
-            print(f"select.POLLIN: {select.POLLIN}")
-            print(f"select.POLLHUP: {select.POLLHUP}")
-            print(f"select.POLLERR: {select.POLLERR}")
+            self.log.debug(f"on fds: {fds}")
+            self.log.debug(f"select.POLLIN: {select.POLLIN}")
+            self.log.debug(f"select.POLLHUP: {select.POLLHUP}")
+            self.log.debug(f"select.POLLERR: {select.POLLERR}")
 
             for fd, event in fds:
                 # Some events happened
