@@ -23,13 +23,17 @@ class ProcessMonitor:
     class Poller:
         def __init__(self, log):
             self.poller = select.poll()
+            self.processes = {}
             self.log = log
 
         def register(self, process):
 
+            # Note that flags POLLHUP and POLLERR can be returned at any time
+            # (even if were not asked for). So we don't need to explicitly
+            # register for them.
             self.poller.register(
                 process.popen.stdout.fileno(),
-                select.POLLHUP | select.POLLERR | select.POLLIN,
+                select.POLLIN,
             )
 
             self.poller.register(
@@ -47,7 +51,40 @@ class ProcessMonitor:
             self.log.debug(f"Unregister process {process}")
 
         def poll(self, timeout):
+
+            fds = self.poller.poll(timeout)
+
+            # First if we have any events, we need to read from the
+            # file descriptors
+            for fd, event in fds:
+                if event & select.POLLIN:
+                    process = self.processes[fd]
+                    process.read(fd)
+
+            # Died pids
+            died = set()
+
+            for fd, event in fds:
+                if event & select.POLLHUP or event & select.POLLERR:
+                    process = self.processes[fd]
+                    died.add(process)
+
+            for dead in died:
+                unregister(dead)
+
+            # Now we need to check if any of the processes have exited
+
             return self.poller.poll(timeout)
+
+        def _readable(self, events):
+            readable = []
+
+            for fd, event in events:
+                if event & select.POLLIN:
+                    readable.append(fd)
+                    events.remove((fd, event))
+
+            return readable, events
 
     class Process:
         """A process object to track the state of a process"""
