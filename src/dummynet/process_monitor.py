@@ -1,5 +1,6 @@
 import select
 import textwrap
+import os
 
 from . import errors
 from . import process
@@ -23,32 +24,42 @@ class ProcessMonitor:
     class Poller:
         def __init__(self, log):
             self.poller = select.poll()
-            self.processes = {}
+            self.fds = {}
             self.log = log
 
-        def register(self, process):
+        def add_fd(self, fd, callback):
 
             # Note that flags POLLHUP and POLLERR can be returned at any time
             # (even if were not asked for). So we don't need to explicitly
             # register for them.
-            self.poller.register(
-                process.popen.stdout.fileno(),
-                select.POLLIN,
-            )
+            self.poller.register(fd, select.POLLIN)
 
-            self.poller.register(
-                process.popen.stderr.fileno(),
-                select.POLLIN,
-            )
+            self.fds[fd] = callback
 
-            self.log.debug(f"Register process {process}")
+            self.log.debug(f"Register process fd {fd}")
 
-        def unregister(self, process):
+        def del_fd(self, fd):
 
-            self.poller.unregister(process.popen.stdout.fileno())
-            self.poller.unregister(process.popen.stderr.fileno())
+            self.poller.unregister(fd)
+            del self.fds[fd]
 
-            self.log.debug(f"Unregister process {process}")
+            self.log.debug(f"Unregister process fd{fd}")
+
+        def read_fd(self, fd):
+
+            while True:
+                try:
+                    data = os.read(fd, 4096)
+                except BlockingIOError:
+                    break
+
+                if not data:
+                    break
+
+                self.log.debug(f"Read {len(data)} bytes from fd {fd}")
+
+                # Call the callback
+                self.fds[fd](data)
 
         def poll(self, timeout):
 
@@ -58,33 +69,14 @@ class ProcessMonitor:
             # file descriptors
             for fd, event in fds:
                 if event & select.POLLIN:
-                    process = self.processes[fd]
-                    process.read(fd)
-
-            # Died pids
-            died = set()
+                    self.read_fd(fd)
 
             for fd, event in fds:
-                if event & select.POLLHUP or event & select.POLLERR:
-                    process = self.processes[fd]
-                    died.add(process)
+                if event & select.POLLHUP:
+                    self.del_fd(fd=fd)
 
-            for dead in died:
-                unregister(dead)
-
-            # Now we need to check if any of the processes have exited
-
-            return self.poller.poll(timeout)
-
-        def _readable(self, events):
-            readable = []
-
-            for fd, event in events:
-                if event & select.POLLIN:
-                    readable.append(fd)
-                    events.remove((fd, event))
-
-            return readable, events
+                elif event & select.POLLERR:
+                    self.del_fd(fd=fd)
 
     class Process:
         """A process object to track the state of a process"""
@@ -194,7 +186,12 @@ class ProcessMonitor:
         # Get the file descriptor
         process = ProcessMonitor.Process(popen, result, log=self.log)
 
-        self.poller.register(process)
+        self.poller.add_fd(
+            process.popen.stdout.fileno(), lambda data: result.stdout.append(data)
+        )
+        self.poller.add_fd(
+            process.popen.stderr.fileno(), lambda data: result.stderr.append(data)
+        )
 
         self.running.append(process)
 
