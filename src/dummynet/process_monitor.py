@@ -36,14 +36,14 @@ class ProcessMonitor:
 
             self.fds[fd] = callback
 
-            self.log.debug(f"Register process fd {fd}")
+            self.log.debug(f"Poller: register process fd {fd}")
 
         def del_fd(self, fd):
 
             self.poller.unregister(fd)
             del self.fds[fd]
 
-            self.log.debug(f"Unregister process fd{fd}")
+            self.log.debug(f"Poller: unregister process fd{fd}")
 
         def read_fd(self, fd):
 
@@ -56,7 +56,7 @@ class ProcessMonitor:
                 if not data:
                     break
 
-                self.log.debug(f"Read {len(data)} bytes from fd {fd}")
+                self.log.debug(f"Poller: read {len(data)} bytes from fd {fd}")
 
                 # Call the callback
                 self.fds[fd](data)
@@ -132,40 +132,162 @@ class ProcessMonitor:
                 """
             )
 
+    class Stopped:
+        def __init__(self) -> None:
+            self.processes = []
+
+        def add_process(self, process):
+            self.processes.append(process)
+
+        def stop(self):
+            raise RuntimeError("Idle.stop() called")
+
+        def validate(self):
+            if not self.processes:
+                # No processes in running or died
+                raise errors.NoProcessesError()
+
+            # Check that we have non daemon processes
+            for process in self.processes:
+                if not process.result.is_daemon:
+                    return
+
+            raise errors.AllDaemonsError()
+
+    class Waiting:
+        def __init__(self) -> None:
+            self.processes = []
+
+        def add_process(self, process):
+            self.processes.append(process)
+
+        def stop(self):
+            raise RuntimeError("Waiting.stop() called")
+
+        def validate(self):
+            if not self.processes:
+                # No processes in running or died
+                raise errors.NoProcessesError()
+
+            # Check that we have non daemon processes
+            for process in self.processes:
+                if not process.result.is_daemon:
+                    return
+
+            raise errors.AllDaemonsError()
+
+    class Running:
+        def __init__(self, processes, log) -> None:
+            # A dictionary of running processes
+            self.running = []
+
+            # List of died processes
+            self.died = []
+
+            # The poller is used to wait for processes to terminate
+            self.poller = ProcessMonitor.Poller(log=log)
+
+        def add_process(self, process):
+            # Make sure the process is running
+            popen.poll()
+
+            # The returncode should be None if the process is running
+            if not popen.returncode is None:
+                raise RuntimeError(
+                    "Process not running: "
+                    "returncode={} stderr={}".format(
+                        popen.returncode, popen.stderr.read()
+                    )
+                )
+            # Get the file descriptor
+            process = ProcessMonitor.Process(popen, result, log=self.log)
+
+            self.poller.add_fd(
+                process.popen.stdout.fileno(), lambda data: result.stdout.append(data)
+            )
+            self.poller.add_fd(
+                process.popen.stderr.fileno(), lambda data: result.stderr.append(data)
+            )
+
+            self.running.append(process)
+
+        def poll(self, timeout):
+
+            # Poll for events
+            self.poller.poll(timeout)
+
+            # Check if any process has died
+            for process in self.running:
+                process.popen.poll()
+                if process.popen.returncode:
+                    self.died.append(process)
+
+            # Remove the died processes from the running list
+            self.running = [p for p in self.running if p not in self.died]
+
+        def _died(self):
+            # Check if we had a normal exit
+            if process.popen.returncode:
+
+                # The process had a non-zero return code
+                raise RuntimeError("Unexpected exit {}".format(process))
+
+            if process.result.is_daemon:
+
+                # The process was a daemon - these should not exit
+                # until after the test is over
+                raise errors.DaemonExitError(process)
+
+        def stop(self):
+            for process in self.running:
+
+                self.poller.unregister(process)
+
+                process.popen.poll()
+                if process.popen.returncode:
+                    raise RuntimeError("Process exited with error {}".format(process))
+
+                process.popen.kill()
+
+            self.running = {}
+            self.died = []
+
+        def keep_running(self):
+            """Check if the test is over.
+
+            The ProcessMonitor should continue running for as long as there
+            are non daemon processes active.
+            """
+
+            for process in self.running:
+                if not process.result.is_daemon:
+                    # A process which is not a daemon is still running
+                    return True
+
+            # Only daemon processes running
+            return False
+
     def __init__(self, log):
         """Create a new test monitor"""
 
-        # A dictionary of running processes
-        self.running = []
-
-        # List of died processes
-        self.died = []
-
-        # The poller is used to wait for processes to terminate
-        self.poller = ProcessMonitor.Poller(log=log)
+        # The state of the monitor
+        self.state = ProcessMonitor.Stopped()
 
         # The log object
         self.log = log
 
-    def __enter__(self):
-        pass
-
     def stop(self):
-        for process in self.running:
+        """Stop all processes"""
 
-            self.poller.unregister(process)
+        if isinstance(self.state, ProcessMonitor.Stopped):
+            raise RuntimeError("Monitor in stopped state")
 
-            process.popen.poll()
-            if process.popen.returncode:
-                raise RuntimeError("Process exited with error {}".format(process))
+        if isinstance(self.state, ProcessMonitor.Waiting):
+            raise RuntimeError("Monitor in waiting state")
 
-            process.popen.kill()
-
-        self.running = {}
-        self.died = []
-
-    def __exit__(self, type, value, traceback):
-        self.stop()
+        elif isinstance(self.state, ProcessMonitor.Running):
+            self.state.stop()
+            self.state = ProcessMonitor.Stopped()
 
     def add_process(self, popen, result):
         """Add a process to the monitor.
@@ -174,26 +296,10 @@ class ProcessMonitor:
         :param result: The dummynet.RunResult object
         """
 
-        # Make sure the process is running
-        popen.poll()
+        if isinstance(self.state, ProcessMonitor.Stopped):
+            self.state = ProcessMonitor.Waiting()
 
-        # The returncode should be None if the process is running
-        if not popen.returncode is None:
-            raise RuntimeError(
-                "Process not running: "
-                "returncode={} stderr={}".format(popen.returncode, popen.stderr.read())
-            )
-        # Get the file descriptor
-        process = ProcessMonitor.Process(popen, result, log=self.log)
-
-        self.poller.add_fd(
-            process.popen.stdout.fileno(), lambda data: result.stdout.append(data)
-        )
-        self.poller.add_fd(
-            process.popen.stderr.fileno(), lambda data: result.stderr.append(data)
-        )
-
-        self.running.append(process)
+        self.state.add_process(popen, result)
 
     def run(self, timeout=500):
         """Run the process monitor.
@@ -211,118 +317,23 @@ class ProcessMonitor:
                     pass
         """
 
-        self._check_state()
+        if isinstance(self.state, ProcessMonitor.Stopped):
+            # It ok to be in the stopped state here. Likely it is the user
+            # who has called stop() in the while run() loop.
+            return
 
-        while self._keep_running():
-            fds = self.poller.poll(timeout)
+        if isinstance(self.state, ProcessMonitor.Waiting):
+            # We are waiting to run
+            self.state.validate()
 
-            if not fds:
-                # We got a timeout
-                return True
+            self.state = ProcessMonitor.Running(
+                processes=self.state.processes, log=self.log
+            )
 
-            self.log.debug(f"on fds: {fds}")
-            self.log.debug(f"select.POLLIN: {select.POLLIN}")
-            self.log.debug(f"select.POLLHUP: {select.POLLHUP}")
-            self.log.debug(f"select.POLLERR: {select.POLLERR}")
+        # We are in the running state
+        self.state.poll(timeout=timeout)
 
-            for fd, event in fds:
-                # Some events happened
-                if event == select.POLLIN:
-                    # We got data
-                    self._read(fd=fd)
-                elif event in [select.POLLHUP, select.POLLERR]:
-                    # The process died
-                    self._died(fd=fd)
-                else:
-                    raise RuntimeError("Unknown event {}".format(event))
+        if self.state.keep_running():
+            return True
 
         self.stop()
-        return False
-
-    def _check_state(self):
-        """Check that the state is valid."""
-
-        if not self.running and not self.died:
-            # No processes in running or died
-            raise errors.NoProcessesError()
-
-        # Check that we have non daemon processes
-        for process in self.running:
-            if not process.result.is_daemon:
-                return
-
-        for process in self.died:
-            if not process.result.is_daemon:
-                return
-
-        raise errors.AllDaemonsError()
-
-    def _find_process(self, fd):
-        """Find a process by file descriptor.
-
-        :param fd: The file descriptor to find
-        """
-
-        for process in self.running:
-            if process.has_fd(fd):
-                return process
-
-        raise RuntimeError(f"Unknown process for fd {fd}")
-
-    def _read(self, fd):
-        """A process has written data.
-
-        :param fd: File descriptor for the process.
-        :param event: The event that occurred.
-        """
-        process = self._find_process(fd)
-
-        # Read the data
-        process.read(fd)
-
-    def _died(self, fd):
-        """A process has died.
-
-        When a process dies we remove it from the running
-        dict.
-
-        :param fd: File descriptor for the process.
-        """
-
-        process = self._find_process(fd)
-
-        # We found the process
-        self.poller.unregister(process)
-
-        self.running.remove(process)
-        self.died.append(process)
-
-        # Update the return code
-        process.popen.wait()
-
-        # Check if we had a normal exit
-        if process.popen.returncode:
-
-            # The process had a non-zero return code
-            raise RuntimeError("Unexpected exit {}".format(process))
-
-        if process.result.is_daemon:
-
-            # The process was a daemon - these should not exit
-            # until after the test is over
-            raise errors.DaemonExitError(process)
-
-    def _keep_running(self):
-        """Check if the test is over.
-
-        The ProcessMonitor should continue running for as long as there
-        are non daemon processes active.
-        """
-
-        for process in self.running:
-            if not process.result.is_daemon:
-                # A process which is not a daemon is still running
-                return True
-
-        # Only daemon processes running
-        return False
