@@ -20,7 +20,7 @@ Introduction
       :target: https://github.com/steinwurf/dummynet-python/actions/workflows/pip.yml
 
 
-dummynet is a tool for creating local test networks in Python on Linux.
+DummyNet is a tool for creating local test networks in Python on Linux.
 
 Find documentation for DummyNet here:
 
