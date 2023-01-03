@@ -1,9 +1,7 @@
 import subprocess
-import time
 
-from . import run_result
+from . import run_info
 from . import errors
-from . import process
 
 
 class HostShell(object):
@@ -52,7 +50,7 @@ class HostShell(object):
         stdout, stderr = process.communicate()
         returncode = process.wait()
 
-        result = run_result.RunResult(
+        result = run_info.RunInfo(
             cmd=cmd,
             cwd=cwd,
             stdout=stdout,
@@ -63,7 +61,7 @@ class HostShell(object):
         )
 
         if result.returncode != 0:
-            raise errors.RunResultError(result=result)
+            raise errors.RunInfoError(result=result)
 
         return result
 
@@ -91,21 +89,16 @@ class HostShell(object):
             text=True,
         )
 
-        running = process.Process(
-            popen=popen,
+        result = run_info.RunInfo(
             cmd=cmd,
             cwd=cwd,
+            stdout="",
+            stderr="",
+            returncode=None,
             is_async=True,
             is_daemon=daemon,
         )
 
-        self.process_monitor.add_process(
-            process=running,
-        )
+        self.process_monitor.add_process(popen, result)
 
-        # If we are launching a daemon we wait 0.5 sec for
-        # it to launch
-        if daemon:
-            time.sleep(0.5)
-
-        return running
+        return result

@@ -3,20 +3,28 @@ import fnmatch
 from . import errors
 
 
-class RunResult:
+class RunInfo:
     """Stores the results from running a command
 
-    :ivar cmd: see :meth:`RunResult.__init__`
-    :ivar cwd: see :meth:`RunResult.__init__`
-    :ivar stdout: see :meth:`RunResult.__init__`
-    :ivar stderr: see :meth:`RunResult.__init__`
-    :ivar returncode: see :meth:`RunResult.__init__`
-    :ivar is_async: see :meth:`RunResult.__init__`
-    :ivar is_daemon: see :meth:`RunResult.__init__`
+    :ivar cmd: see :meth:`RunInfo.__init__`
+    :ivar cwd: see :meth:`RunInfo.__init__`
+    :ivar stdout: see :meth:`RunInfo.__init__`
+    :ivar stderr: see :meth:`RunInfo.__init__`
+    :ivar returncode: see :meth:`RunInfo.__init__`
+    :ivar is_async: see :meth:`RunInfo.__init__`
+    :ivar is_daemon: see :meth:`RunInfo.__init__`
+    :ivar stdout_callback: The callback to be called when the standard output
+                            stream is received  (default: None). The callback
+                            should accept a single argument which is the data
+                            received.
+    :ivar stderr_callback: The callback to be called when the standard error
+                            stream is received  (default: None). The callback
+                            should accept a single argument which is the data
+                            received.
     """
 
     def __init__(self, cmd, cwd, stdout, stderr, returncode, is_async, is_daemon):
-        """Create a new RunResult object
+        """Create a new object
 
         :param cmd: The command that was executed
         :param cwd: Current working directory i.e. path where the command was executed
@@ -34,6 +42,8 @@ class RunResult:
         self.returncode = returncode
         self.is_async = is_async
         self.is_daemon = is_daemon
+        self.stdout_callback = None
+        self.stderr_callback = None
 
     def match(self, stdout=None, stderr=None):
         """Matches the lines in the output with the pattern. The match
@@ -85,9 +95,9 @@ class RunResult:
             )
 
     def __str__(self):
-        """Print the RunResult object as a string"""
+        """Print the RunInfo object as a string"""
         run_string = (
-            "RunResult\n"
+            "RunInfo\n"
             "command: {command}\n"
             "cwd: {cwd}\n"
             "returncode: {returncode}\n"

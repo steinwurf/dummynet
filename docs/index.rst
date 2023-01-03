@@ -1,55 +1,35 @@
-Welcome to Dummynet's documentation!
+Welcome to DummyNet's documentation!
 ====================================
 
-Light weight network testing tool::
+A Python based light-weight network testing tool using network namespaces.
 
-   import dummynet
-   import logging
+DummyNet is a tool for working local test networks in Python on a Linux
+machine. By using a virtual network namespace, it is possible to create
+virtual network interfaces and to connect them to each other. This allows
+you to test your network applications without the need to have a real
+network connection.
 
-   log = logging.getLogger("dummynet")
-   log.setLevel(logging.DEBUG)
+The :ref:`dummynetDummyNet` class is a Python wrapper for the Linux ``ip netns``
+and ``ip link`` tools.
 
-   # Create a process monitor
-   process_monitor = dummynet.ProcessMonitor()
+So far, Ubuntu and Debian are supported, but please make sure, that you
+have the iproute2 linux-package installed with::
 
-   # The shell used to run commands
-   shell = dummynet.HostShell(log=log, sudo=True, process_monitor=process_monitor)
+    apt-get install iproute2
 
-   # DummyNet allows us to create a virtual network
-   net = DummyNet(shell=shell)
+Other Linux operating systems have not been tested, but feel free to open an
+issue if support is needed.
 
-   try:
+To get started, please read the :ref:`quick start` section.
 
-      # Run a command on the host
-      out = net.run(cmd="ping -c 5 8.8.8.8")
-      out.match(stdout="5 packets transmitted*", stderr=None)
-
-      # create two namespaces
-      demo0 = net.netns_add(name="demo0")
-      demo1 = net.netns_add(name="demo1")
-
-      out = net.run_async(cmd="ping -c 5000 8.8.8.8")
-
-      end_time = time.time() + 2
-
-      while process_monitor.run():
-         if time.time() >= end_time:
-               log.debug("Test timeout")
-               break
-
-   finally:
-
-      # Clean up.
-      net.cleanup()
-
-      # Close any running async commands
-      process_monitor.stop()
 
 .. toctree::
    :maxdepth: 2
    :hidden:
 
+   quick_start
    api/api
+   developers
 
 
 

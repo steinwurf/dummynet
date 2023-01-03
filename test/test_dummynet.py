@@ -89,11 +89,12 @@ def test_run():
 
 def test_run_async():
 
-    log = logging.getLogger("dummynet")
-
     sudo = False if os.geteuid() == 0 else True
 
-    process_monitor = ProcessMonitor()
+    log = logging.getLogger("dummynet")
+    log.setLevel(logging.DEBUG)
+
+    process_monitor = ProcessMonitor(log=log)
 
     shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
 
@@ -128,14 +129,20 @@ def test_run_async():
         proc0 = demo0.run_async(cmd="ping -c 10 10.0.0.2")
         proc1 = demo1.run_async(cmd="ping -c 10 10.0.0.1")
 
-        # process_monitor.add_process(proc0)
-        # process_monitor.add_process(proc1)
+        def _proc0_stdout(data):
+            print("proc0: {}".format(data))
+
+        def _proc1_stdout(data):
+            print("proc1: {}".format(data))
+
+        proc0.stdout_callback = _proc0_stdout
+        proc1.stdout_callback = _proc1_stdout
 
         while process_monitor.run():
             pass
 
-        proc0.result.match(stdout="10 packets transmitted*", stderr=None)
-        proc1.result.match(stdout="10 packets transmitted*", stderr=None)
+        proc0.match(stdout="10 packets transmitted*", stderr=None)
+        proc1.match(stdout="10 packets transmitted*", stderr=None)
 
     finally:
 
@@ -150,7 +157,7 @@ def test_with_timeout():
     log.addHandler(logging.StreamHandler())
 
     # Create a process monitor
-    process_monitor = ProcessMonitor()
+    process_monitor = ProcessMonitor(log=log)
 
     # The host shell used if we don't have a recording
     shell = HostShell(log=log, sudo=True, process_monitor=process_monitor)
@@ -172,15 +179,12 @@ def test_with_timeout():
         while process_monitor.run():
             if time.time() >= end_time:
                 log.debug("Test timeout")
-                break
+                process_monitor.stop()
 
     finally:
 
         # Clean up.
         net.cleanup()
-
-        # Close any running async commands
-        process_monitor.stop()
 
 
 def test_daemon_exit():
@@ -192,26 +196,19 @@ def test_daemon_exit():
     sudo = False if os.geteuid() == 0 else True
 
     # Create a process monitor
-    process_monitor = ProcessMonitor()
+    process_monitor = ProcessMonitor(log=log)
 
     # The host shell used if we don't have a recording
     shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
 
-    try:
+    # Run two commands on the host where the daemon will exit
+    # before the non-daemon command
+    shell.run_async(cmd="ping -c 5 8.8.8.8", daemon=True)
+    shell.run_async(cmd="ping -c 50 8.8.8.8")
 
-        # Run two commands on the host where the daemon will exit
-        # before the non-daemon command
-        shell.run_async(cmd="ping -c 5 8.8.8.8", daemon=True)
-        shell.run_async(cmd="ping -c 50 8.8.8.8")
-
-        with pytest.raises(dummynet.DaemonExitError):
-            while process_monitor.run():
-                pass
-
-    finally:
-
-        # Close any running async commands
-        process_monitor.stop()
+    with pytest.raises(dummynet.DaemonExitError):
+        while process_monitor.run():
+            pass
 
 
 def test_all_daemons():
@@ -223,26 +220,19 @@ def test_all_daemons():
     sudo = False if os.geteuid() == 0 else True
 
     # Create a process monitor
-    process_monitor = ProcessMonitor()
+    process_monitor = ProcessMonitor(log=log)
 
     # The host shell used if we don't have a recording
     shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
 
-    try:
+    # Run two commands on the host where the daemon will exit
+    # before the non-daemon command
+    shell.run_async(cmd="ping -c 5 8.8.8.8", daemon=True)
+    shell.run_async(cmd="ping -c 50 8.8.8.8", daemon=True)
 
-        # Run two commands on the host where the daemon will exit
-        # before the non-daemon command
-        shell.run_async(cmd="ping -c 5 8.8.8.8", daemon=True)
-        shell.run_async(cmd="ping -c 50 8.8.8.8", daemon=True)
-
-        with pytest.raises(dummynet.AllDaemonsError):
-            while process_monitor.run():
-                pass
-
-    finally:
-
-        # Close any running async commands
-        process_monitor.stop()
+    with pytest.raises(dummynet.AllDaemonsError):
+        while process_monitor.run():
+            pass
 
 
 def test_no_processes():
@@ -252,88 +242,8 @@ def test_no_processes():
     log.addHandler(logging.StreamHandler())
 
     # Create a process monitor
-    process_monitor = ProcessMonitor()
+    process_monitor = ProcessMonitor(log=log)
 
-    try:
-
-        with pytest.raises(dummynet.NoProcessesError):
-            while process_monitor.run():
-                pass
-
-    finally:
-
-        # Close any running async commands
-        process_monitor.stop()
-
-
-def test_pendingresult():
-
-    log = logging.getLogger("dummynet")
-    log.setLevel(logging.DEBUG)
-    log.addHandler(logging.StreamHandler())
-
-    # Create a process monitor
-    process_monitor = ProcessMonitor()
-
-    sudo = False if os.geteuid() == 0 else True
-
-    # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-
-    # DummyNet wrapper that will prevent clean up from happening in playback
-    # mode if an exception occurs
-    net = DummyNet(shell=shell)
-
-    try:
-
-        # Run a command on the host
-        out = net.run_async(cmd="ping -c 5 8.8.8.8")
-
-        while process_monitor.run():
-            pass
-
-        out.result.match(stdout="5 packets transmitted*", stderr=None)
-
-    finally:
-
-        # Clean up.
-        net.cleanup()
-
-        # Close any running async commands
-        process_monitor.stop()
-
-
-def test_process_still_running():
-
-    log = logging.getLogger("dummynet")
-    log.setLevel(logging.DEBUG)
-    log.addHandler(logging.StreamHandler())
-
-    # Create a process monitor
-    process_monitor = ProcessMonitor()
-
-    sudo = False if os.geteuid() == 0 else True
-
-    # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-
-    # DummyNet wrapper that will prevent clean up from happening in playback
-    # mode if an exception occurs
-    net = DummyNet(shell=shell)
-
-    try:
-
-        # Run a command on the host
-        out = net.run_async(cmd="ping -c 50 8.8.8.8")
-
-        with pytest.raises(dummynet.ProcessRunningError):
-            while process_monitor.run():
-                out.result.match(stdout="5 packets transmitted*", stderr=None)
-
-    finally:
-
-        # Close any running async commands
-        process_monitor.stop()
-
-        # Clean up.
-        net.cleanup()
+    # Nothing to do
+    while process_monitor.run():
+        pass

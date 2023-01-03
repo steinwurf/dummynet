@@ -10,5 +10,5 @@ Overview of the public API.
    process_monitor
    process
    host_shell
-   run_result
+   run_info
 
