@@ -194,11 +194,14 @@ class ProcessMonitor:
             self.died.append(process)
             self.running.remove(process)
 
+            # Set the return code
+            process.info.returncode = process.popen.returncode
+
             # Check if we had a normal exit
             if process.popen.returncode:
 
                 # The process had a non-zero return code
-                raise RuntimeError("Unexpected exit {}".format(process))
+                raise errors.RunInfoError(info=process.info)
 
             if process.info.is_daemon:
 

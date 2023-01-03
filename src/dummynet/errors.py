@@ -8,9 +8,9 @@ class DummyNetError(Exception):
 class RunInfoError(DummyNetError):
     """Exception for run result errors"""
 
-    def __init__(self, result):
-        super().__init__(str(result))
-        self.result = result
+    def __init__(self, info):
+        super().__init__(str(info))
+        self.info = info
 
 
 class MatchError(DummyNetError):
