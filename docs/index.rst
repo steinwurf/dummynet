@@ -1,9 +1,9 @@
-Welcome to Dummynet's documentation!
+Welcome to DummyNet's documentation!
 ====================================
 
 A Python based light-weight network testing tool using network namespaces.
 
-Dummynet is a tool for working local test networks in Python on a Linux
+DummyNet is a tool for working local test networks in Python on a Linux
 machine. By using a virtual network namespace, it is possible to create
 virtual network interfaces and to connect them to each other. This allows
 you to test your network applications without the need to have a real

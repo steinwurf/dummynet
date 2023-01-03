@@ -22,7 +22,7 @@ Introduction
 
 dummynet is a tool for creating local test networks in Python on Linux.
 
-Find more information on the dummynet project here:
+Find documentation for DummyNet here:
 
 https://dummynet.steinwurf.com
 
