@@ -3,47 +3,66 @@ Welcome to Dummynet's documentation!
 
 Light weight network testing tool::
 
-   import dummynet
-   import logging
-
    log = logging.getLogger("dummynet")
    log.setLevel(logging.DEBUG)
 
-   # Create a process monitor
-   process_monitor = dummynet.ProcessMonitor()
+   process_monitor = ProcessMonitor(log=log)
 
-   # The shell used to run commands
-   shell = dummynet.HostShell(log=log, sudo=True, process_monitor=process_monitor)
+   shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
 
-   # DummyNet allows us to create a virtual network
    net = DummyNet(shell=shell)
 
    try:
 
-      # Run a command on the host
-      out = net.run(cmd="ping -c 5 8.8.8.8")
-      out.match(stdout="5 packets transmitted*", stderr=None)
+      # Get a list of the current namespaces
+      namespaces = net.netns_list()
+      assert namespaces == []
 
       # create two namespaces
       demo0 = net.netns_add(name="demo0")
       demo1 = net.netns_add(name="demo1")
 
-      out = net.run_async(cmd="ping -c 5000 8.8.8.8")
+      net.link_veth_add(p1_name="demo0-eth0", p2_name="demo1-eth0")
 
-      end_time = time.time() + 2
+      # Move the interfaces to the namespaces
+      net.link_set(namespace="demo0", interface="demo0-eth0")
+      net.link_set(namespace="demo1", interface="demo1-eth0")
+
+      # Bind an IP-address to the two peers in the link.
+      demo0.addr_add(ip="10.0.0.1/24", interface="demo0-eth0")
+      demo1.addr_add(ip="10.0.0.2/24", interface="demo1-eth0")
+
+      # Activate the interfaces.
+      demo0.up(interface="demo0-eth0")
+      demo1.up(interface="demo1-eth0")
+      demo0.up(interface="lo")
+      demo1.up(interface="lo")
+
+      # Test will run until last non-daemon process is done.
+      proc0 = demo0.run_async(cmd="ping -c 20 10.0.0.2", daemon=True)
+      proc1 = demo1.run_async(cmd="ping -c 10 10.0.0.1")
+
+      # Print output as we go
+      def _proc0_stdout(data):
+         print("proc0: {}".format(data))
+
+      def _proc1_stdout(data):
+         print("proc1: {}".format(data))
+
+      proc0.stdout_callback = _proc0_stdout
+      proc1.stdout_callback = _proc1_stdout
 
       while process_monitor.run():
-         if time.time() >= end_time:
-               log.debug("Test timeout")
-               break
+         pass
+
+      # Check that the ping succeeded.
+      proc0.match(stdout="10 packets transmitted*", stderr=None)
+      proc1.match(stdout="10 packets transmitted*", stderr=None)
 
    finally:
 
       # Clean up.
       net.cleanup()
-
-      # Close any running async commands
-      process_monitor.stop()
 
 .. toctree::
    :maxdepth: 2

@@ -5,7 +5,7 @@ class DummyNetError(Exception):
         super().__init__(message)
 
 
-class RunResultError(DummyNetError):
+class RunInfoError(DummyNetError):
     """Exception for run result errors"""
 
     def __init__(self, result):
@@ -56,10 +56,14 @@ class NoProcessesError(DummyNetError):
         super().__init__(f"No processes were added")
 
 
-class ProcessRunningError(DummyNetError):
-    """Exception for when the process monitor is started without any
-    processes.
+class ProcessExitError(DummyNetError):
+    """Exception for when the process monitor is started with an already terminated process
+    process
     """
 
-    def __init__(self, cmd, cwd):
-        super().__init__(f"Process {cmd} in {cwd} not terminated while getting result")
+    def __init__(self, process):
+        super().__init__(
+            f"Process {process.info.cmd} in {process.info.cwd} exited "
+            f"with {process.popen.returncode} before process monitor "
+            "was started."
+        )

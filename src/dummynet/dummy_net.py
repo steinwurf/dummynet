@@ -108,7 +108,7 @@ class DummyNet(object):
 
         :param cmd: The command to run
         :param cwd: The working directory to run the command in
-        :return: A :ref:`dummynetrunresult` object
+        :return: A :ref:`dummynetruninfo` object
         """
 
         return self.shell.run(cmd=cmd, cwd=cwd)
@@ -122,7 +122,7 @@ class DummyNet(object):
         :param cmd: The command to run
         :param daemon: Whether to run the command as a daemon
         :param cwd: The working directory to run the command in
-        :return: A :ref:`dummynetprocess` object
+        :return: A :ref:`dummynetruninfo` object
         """
 
         return self.shell.run_async(cmd=cmd, daemon=daemon, cwd=cwd)
