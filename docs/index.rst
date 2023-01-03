@@ -1,77 +1,35 @@
 Welcome to Dummynet's documentation!
 ====================================
 
-Light weight network testing tool::
+A Python based light-weight network testing tool using network namespaces.
 
-   import logging
-   import dummynet
+Dummynet is a tool for working local test networks in Python on a Linux
+machine. By using a virtual network namespace, it is possible to create
+virtual network interfaces and to connect them to each other. This allows
+you to test your network applications without the need to have a real
+network connection.
 
-   log = logging.getLogger("dummynet")
-   log.setLevel(logging.DEBUG)
+The :ref:`dummynetDummyNet` class is a Python wrapper for the Linux ``ip netns``
+and ``ip link`` tools.
 
-   process_monitor = dummynet.ProcessMonitor(log=log)
+So far, Ubuntu and Debian are supported, but please make sure, that you
+have the iproute2 linux-package installed with::
 
-   shell = dummynet.HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+    apt-get install iproute2
 
-   net = dummynet.DummyNet(shell=shell)
+Other Linux operating systems have not been tested, but feel free to open an
+issue if support is needed.
 
-   try:
+To get started, please read the :ref:`quick start` section.
 
-      # Get a list of the current namespaces
-      namespaces = net.netns_list()
-      assert namespaces == []
-
-      # create two namespaces
-      demo0 = net.netns_add(name="demo0")
-      demo1 = net.netns_add(name="demo1")
-
-      net.link_veth_add(p1_name="demo0-eth0", p2_name="demo1-eth0")
-
-      # Move the interfaces to the namespaces
-      net.link_set(namespace="demo0", interface="demo0-eth0")
-      net.link_set(namespace="demo1", interface="demo1-eth0")
-
-      # Bind an IP-address to the two peers in the link.
-      demo0.addr_add(ip="10.0.0.1/24", interface="demo0-eth0")
-      demo1.addr_add(ip="10.0.0.2/24", interface="demo1-eth0")
-
-      # Activate the interfaces.
-      demo0.up(interface="demo0-eth0")
-      demo1.up(interface="demo1-eth0")
-      demo0.up(interface="lo")
-      demo1.up(interface="lo")
-
-      # Test will run until last non-daemon process is done.
-      proc0 = demo0.run_async(cmd="ping -c 20 10.0.0.2", daemon=True)
-      proc1 = demo1.run_async(cmd="ping -c 10 10.0.0.1")
-
-      # Print output as we go
-      def _proc0_stdout(data):
-         print("proc0: {}".format(data))
-
-      def _proc1_stdout(data):
-         print("proc1: {}".format(data))
-
-      proc0.stdout_callback = _proc0_stdout
-      proc1.stdout_callback = _proc1_stdout
-
-      while process_monitor.run():
-         pass
-
-      # Check that the ping succeeded.
-      proc0.match(stdout="10 packets transmitted*", stderr=None)
-      proc1.match(stdout="10 packets transmitted*", stderr=None)
-
-   finally:
-
-      # Clean up.
-      net.cleanup()
 
 .. toctree::
    :maxdepth: 2
    :hidden:
 
+   quick_start
    api/api
+   developers
 
 
 

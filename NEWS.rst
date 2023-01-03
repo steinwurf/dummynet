@@ -5,6 +5,7 @@ every change, see the Git log.
 
 Latest
 ------
+* Major: Yet another rewrite to better support output from multiple processes.
 * Major: Rewrite of dummynet to add support for managing multiple processes.
 
 1.0.2
