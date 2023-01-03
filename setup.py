@@ -10,39 +10,7 @@ cwd = os.path.abspath(os.path.dirname(__file__))
 with io.open(os.path.join(cwd, "README.rst"), encoding="utf-8") as fd:
     long_description = fd.read()
 
-with io.open(os.path.join(cwd, "wscript"), encoding="utf-8") as fd:
-
-    VERSION = None
-
-    regex = re.compile(
-        r"""
-    (                   # Group and match
-        VERSION         #    Match 'VERSION'
-        \s*             #    Match zero or more spaces
-        =               #    Match and equal sign
-        \s*             #    Match zero or more spaces
-    )                   # End group
-    "                   # Match "
-    (                   # Group and match
-         \d+\.\d+\.\d+  #    Match digit(s).digit(s).digit(s) e.g. 10.2.3
-    )                   # End of group
-    "                   # Match "
-    """,
-        re.VERBOSE,
-    )
-
-    for line in fd:
-
-        match = regex.match(line)
-        if not match:
-            continue
-
-        # The second parenthesized subgroup.
-        VERSION = match.group(2)
-        break
-
-    else:
-        sys.exit("No VERSION variable defined in wscript - aborting!")
+VERSION = "1.0.2"
 
 setup(
     name="dummynet",
@@ -50,7 +18,7 @@ setup(
     description=("A tool for creating dummy networks using network namespaces."),
     long_description=long_description,
     long_description_content_type="text/x-rst",
-    url="https://github.com/steinwurf/dummynet-python",
+    url="https://github.com/steinwurf/dummynet",
     author="Steinwurf ApS",
     author_email="contact@steinwurf.com",
     license='BSD 3-clause "New" or "Revised" License',
@@ -68,5 +36,5 @@ setup(
     keywords=("dummynet", "network", "namespace"),
     packages=find_packages(where="src", exclude=["test"]),
     package_dir={"": "src"},
-    install_requires=["docker"],
+    install_requires=[],
 )

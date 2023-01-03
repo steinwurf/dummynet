@@ -8,3 +8,4 @@ coverage
 venv-test
 test-venv
 .vscode
+**/__pycache__

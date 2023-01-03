@@ -84,6 +84,16 @@ def upload(bld):
         venv.run(f"python -m twine upload {wheel}")
 
 
+def prepare_release(ctx):
+    """Prepare a release."""
+
+    with ctx.rewrite_file(filename="setup.py") as f:
+        pattern = r'VERSION = "\d+\.\d+\.\d+"'
+        replacement = f'VERSION = "{VERSION}"'
+
+        f.regex_replace(pattern=pattern, replacement=replacement)
+
+
 def docs(ctx):
     """Build the documentation"""
 
