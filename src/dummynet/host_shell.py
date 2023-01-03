@@ -1,9 +1,7 @@
 import subprocess
-import time
 
 from . import run_info
 from . import errors
-from . import process
 
 
 class HostShell(object):

@@ -3,14 +3,17 @@ Welcome to Dummynet's documentation!
 
 Light weight network testing tool::
 
+   import logging
+   import dummynet
+
    log = logging.getLogger("dummynet")
    log.setLevel(logging.DEBUG)
 
-   process_monitor = ProcessMonitor(log=log)
+   process_monitor = dummynet.ProcessMonitor(log=log)
 
-   shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+   shell = dummynet.HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
 
-   net = DummyNet(shell=shell)
+   net = dummynet.DummyNet(shell=shell)
 
    try:
 
