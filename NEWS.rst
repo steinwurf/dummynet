@@ -5,6 +5,10 @@ every change, see the Git log.
 
 Latest
 ------
+* tbd
+
+2.0.0
+-----
 * Major: Yet another rewrite to better support output from multiple processes.
 * Major: Rewrite of dummynet to add support for managing multiple processes.
 
