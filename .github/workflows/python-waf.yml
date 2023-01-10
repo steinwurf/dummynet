@@ -11,7 +11,7 @@ jobs:
     runs-on: [self-hosted, Linux, builder, docker]
     container:
       image: python:3.9.5
-      options: --user 0:0
+      options: --user 0:0 --privileged
       volumes:
         - /home/buildbot/.ssh:/root/.ssh
         - /var/run/netns:/var/run/netns:shared
