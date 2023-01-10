@@ -9,11 +9,11 @@ jobs:
   waf:
     name: Waf
     runs-on: [self-hosted, Linux, builder, docker]
-    container:
-      image: python:3.9.5
-      options: --user 0:0 --security-opt apparmor=unconfined
-      volumes:
-        - /home/buildbot/.ssh:/root/.ssh
+    # container:
+    #   image: python:3.9.5
+    #   options: --user 0:0 --security-opt apparmor=unconfined
+    #   volumes:
+    #     - /home/buildbot/.ssh:/root/.ssh
     steps:
       - name: Checkout
         uses: actions/checkout@v2
