@@ -89,7 +89,7 @@ class HostShell(object):
             text=True,
         )
 
-        result = run_info.RunInfo(
+        info = run_info.RunInfo(
             cmd=cmd,
             cwd=cwd,
             stdout="",
@@ -99,6 +99,6 @@ class HostShell(object):
             is_daemon=daemon,
         )
 
-        self.process_monitor.add_process(popen, result)
+        self.process_monitor.add_process(popen, info)
 
-        return result
+        return info
