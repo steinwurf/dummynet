@@ -50,7 +50,7 @@ class HostShell(object):
         stdout, stderr = process.communicate()
         returncode = process.wait()
 
-        result = run_info.RunInfo(
+        info = run_info.RunInfo(
             cmd=cmd,
             cwd=cwd,
             stdout=stdout,
@@ -60,10 +60,10 @@ class HostShell(object):
             is_daemon=False,
         )
 
-        if result.returncode != 0:
-            raise errors.RunInfoError(result=result)
+        if info.returncode != 0:
+            raise errors.RunInfoError(info=info)
 
-        return result
+        return info
 
     def run_async(self, cmd: str, daemon=False, cwd=None):
         """Run an asynchronous command (non-blocking).
