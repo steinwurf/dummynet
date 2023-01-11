@@ -10,7 +10,7 @@ jobs:
     name: Waf
     runs-on: [self-hosted, Linux, builder, docker]
     container:
-      image: python:3.9.5
+      image: python:3.10.9
       # We run the container with root privileges such that we can create and modify network namespaces.
       options: --user 0:0 --privileged
       volumes:
