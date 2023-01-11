@@ -5,7 +5,8 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Minor: Sort namespace names returned by dummynet.netns.list.
+* Patch: Fix issue when raising `RunInfoError` in `HostShell.run`.
 
 2.0.0
 -----

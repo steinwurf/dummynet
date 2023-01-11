@@ -41,7 +41,7 @@ def test_run():
         # Get a list of the current namespaces
         namespaces = net.netns_list()
 
-        assert namespaces == ["demo2", "demo1", "demo0"]
+        assert namespaces == ["demo0", "demo1", "demo2"]
 
         # Add a bridge in demo1
         demo1.bridge_add(name="br0")
@@ -152,6 +152,8 @@ def test_run_async():
 
 def test_with_timeout():
 
+    sudo = False if os.geteuid() == 0 else True
+
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
     log.addHandler(logging.StreamHandler())
@@ -160,7 +162,7 @@ def test_with_timeout():
     process_monitor = ProcessMonitor(log=log)
 
     # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=True, process_monitor=process_monitor)
+    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
 
     # DummyNet wrapper that will prevent clean up from happening in playback
     # mode if an exception occurs

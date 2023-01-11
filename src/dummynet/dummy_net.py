@@ -218,6 +218,8 @@ class DummyNet(object):
             name = line.split(" ")[0]
             names.append(name)
 
+        names.sort()
+
         return names
 
     def netns_process_list(self, name):
