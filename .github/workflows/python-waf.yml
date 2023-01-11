@@ -12,7 +12,7 @@ jobs:
     container:
       image: python:3.9.5
       # We run the container with root privileges such that we can create and modify network namespaces.
-      options: --user 0:0 --priviliged
+      options: --user 0:0 --privileged
       volumes:
         - /home/buildbot/.ssh:/root/.ssh
     steps:
