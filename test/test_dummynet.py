@@ -41,7 +41,7 @@ def test_run():
         # Get a list of the current namespaces
         namespaces = net.netns_list()
 
-        assert namespaces == ["demo2", "demo1", "demo0"]
+        assert namespaces == ["demo0", "demo1", "demo2"]
 
         # Add a bridge in demo1
         demo1.bridge_add(name="br0")
