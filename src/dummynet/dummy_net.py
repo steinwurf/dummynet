@@ -218,7 +218,8 @@ class DummyNet(object):
             name = line.split(" ")[0]
             names.append(name)
 
-        return names.sort()
+        names = names.sort()
+        return names if names else []
 
     def netns_process_list(self, name):
         """Returns a list of all processes in a network namespace"""
