@@ -53,6 +53,7 @@ class HostShell(object):
         result = run_info.RunInfo(
             cmd=cmd,
             cwd=cwd,
+            pid=process.pid,
             stdout=stdout,
             stderr=stderr,
             returncode=returncode,
@@ -92,6 +93,7 @@ class HostShell(object):
         result = run_info.RunInfo(
             cmd=cmd,
             cwd=cwd,
+            pid=popen.pid,
             stdout="",
             stderr="",
             returncode=None,
