@@ -233,7 +233,11 @@ class DummyNet(object):
         """Kills all processes running in a network namespace"""
 
         for process in self.netns_process_list(name):
-            self.netns_kill_process(name, process)
+
+            try:
+                self.netns_kill_process(name, process)
+            except Exception:
+                self.shell.log.debug(f"Failed to kill process {process} in {name}")
 
     def netns_delete(self, name):
         """Deletes a specific network namespace.
