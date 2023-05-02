@@ -80,8 +80,7 @@ class DummyNet(object):
 
             names.append(result.group("name"))
 
-        names.sort()
-        return names
+        return sorted(names)
 
     def link_delete(self, interface):
         """Deletes a specific network interface."""
@@ -218,7 +217,7 @@ class DummyNet(object):
             name = line.split(" ")[0]
             names.append(name)
 
-        return names
+        return sorted(names)
 
     def netns_process_list(self, name):
         """Returns a list of all processes in a network namespace"""
