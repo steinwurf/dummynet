@@ -8,6 +8,11 @@ Latest
 * Minor: Add pid to RunInfo
 * Minor: Make sure we get stdout and stderr if a process exists before monitor
 
+2.1.0
+-----
+* Minor: Sort namespace names returned by dummynet.netns.list.
+* Patch: Fix issue when raising `RunInfoError` in `HostShell.run`.
+
 2.0.0
 -----
 * Major: Yet another rewrite to better support output from multiple processes.
