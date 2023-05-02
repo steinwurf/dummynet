@@ -28,7 +28,6 @@ class ProcessMonitor:
             self.log = log
 
         def add_fd(self, fd, callback):
-
             # Note that flags POLLHUP and POLLERR can be returned at any time
             # (even if were not asked for). So we don't need to explicitly
             # register for them.
@@ -39,14 +38,12 @@ class ProcessMonitor:
             self.log.debug(f"Poller: register process fd {fd}")
 
         def del_fd(self, fd):
-
             self.poller.unregister(fd)
             del self.fds[fd]
 
             self.log.debug(f"Poller: unregister process fd {fd}")
 
         def read_fd(self, fd):
-
             data = os.read(fd, 4096)
 
             if not data:
@@ -58,7 +55,6 @@ class ProcessMonitor:
             self.fds[fd](data.decode("utf-8"))
 
         def poll(self, timeout):
-
             fds = self.poller.poll(timeout)
 
             self.log.debug(f"Poller: got {len(fds)} events")
@@ -105,11 +101,9 @@ class ProcessMonitor:
             self.running.append(process)
 
         def validate(self):
-
             try:
                 self._validate()
             except Exception:
-
                 # Kill all processes
                 for process in self.running:
                     process.popen.kill()
@@ -143,12 +137,14 @@ class ProcessMonitor:
             self.log = log
 
         def add_process(self, process):
-
             # Make sure the process is running
             process.popen.poll()
 
             # The returncode should be None if the process is running
             if not process.popen.returncode is None:
+                process.info.returncode = process.popen.returncode
+                process.info.stdout, process.info.stderr = process.popen.communicate()
+
                 raise errors.ProcessExitError(process)
 
             self.running.append(process)
@@ -177,20 +173,17 @@ class ProcessMonitor:
             )
 
         def poll(self, timeout):
-
             # Poll for events
             self.poller.poll(timeout)
 
             # Check if any process has died
             for process in self.running:
-
                 process.popen.poll()
 
                 if process.popen.returncode is not None:
                     self._died(process=process)
 
         def _died(self, process):
-
             self.died.append(process)
             self.running.remove(process)
 
@@ -199,12 +192,10 @@ class ProcessMonitor:
 
             # Check if we had a normal exit
             if process.popen.returncode:
-
                 # The process had a non-zero return code
                 raise errors.RunInfoError(info=process.info)
 
             if process.info.is_daemon:
-
                 # The process was a daemon - these should not exit
                 # until after the test is over
                 raise errors.DaemonExitError(process)
@@ -215,21 +206,18 @@ class ProcessMonitor:
             self.log.debug("Stopping all processes")
 
             for process in self.running:
-
                 self.poller.del_fd(process.popen.stdout.fileno())
                 self.poller.del_fd(process.popen.stderr.fileno())
 
                 process.popen.kill()
 
         def run(self, timeout):
-
             try:
                 # Poll for events
                 self.poll(timeout=timeout)
                 return self.keep_running()
 
             except Exception:
-
                 # Stop all processes
                 self.stop()
                 raise
@@ -242,7 +230,6 @@ class ProcessMonitor:
             """
 
             for process in self.running:
-
                 if not process.info.is_daemon:
                     # A process which is not a daemon is still running
                     return True
@@ -308,19 +295,16 @@ class ProcessMonitor:
             return self._run(timeout=timeout)
 
         except Exception as e:
-
             self.state = ProcessMonitor.Stopped()
             raise e
 
     def _run(self, timeout):
-
         if isinstance(self.state, ProcessMonitor.Stopped):
             # It ok to be in the stopped state here. Likely it is the user
             # who has called stop() in the while run() loop.
             return False
 
         if isinstance(self.state, ProcessMonitor.Initializing):
-
             # We are waiting to run
             self.state.validate()
 

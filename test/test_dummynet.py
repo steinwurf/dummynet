@@ -14,7 +14,7 @@ def test_run():
 
     log = logging.getLogger("dummynet")
 
-    sudo = False if os.geteuid() == 0 else True
+    sudo = os.getuid() != 0
 
     # The host shell used if we don't have a recording
     shell = HostShell(log=log, sudo=sudo, process_monitor=None)
@@ -41,7 +41,7 @@ def test_run():
         # Get a list of the current namespaces
         namespaces = net.netns_list()
 
-        assert namespaces == ["demo0", "demo1", "demo2"]
+        assert namespaces == sorted(["demo2", "demo1", "demo0"])
 
         # Add a bridge in demo1
         demo1.bridge_add(name="br0")
@@ -89,7 +89,7 @@ def test_run():
 
 def test_run_async():
 
-    sudo = False if os.geteuid() == 0 else True
+    sudo = os.getuid() != 0
 
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
@@ -152,7 +152,7 @@ def test_run_async():
 
 def test_with_timeout():
 
-    sudo = False if os.geteuid() == 0 else True
+    sudo = os.getuid() != 0
 
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
@@ -191,11 +191,11 @@ def test_with_timeout():
 
 def test_daemon_exit():
 
+    sudo = os.getuid() != 0
+
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
     log.addHandler(logging.StreamHandler())
-
-    sudo = False if os.geteuid() == 0 else True
 
     # Create a process monitor
     process_monitor = ProcessMonitor(log=log)
@@ -215,11 +215,11 @@ def test_daemon_exit():
 
 def test_all_daemons():
 
+    sudo = os.getuid() != 0
+
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
     log.addHandler(logging.StreamHandler())
-
-    sudo = False if os.geteuid() == 0 else True
 
     # Create a process monitor
     process_monitor = ProcessMonitor(log=log)

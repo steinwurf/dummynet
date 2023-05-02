@@ -80,8 +80,7 @@ class DummyNet(object):
 
             names.append(result.group("name"))
 
-        names.sort()
-        return names
+        return sorted(names)
 
     def link_delete(self, interface):
         """Deletes a specific network interface."""
@@ -218,9 +217,7 @@ class DummyNet(object):
             name = line.split(" ")[0]
             names.append(name)
 
-        names.sort()
-
-        return names
+        return sorted(names)
 
     def netns_process_list(self, name):
         """Returns a list of all processes in a network namespace"""
@@ -235,7 +232,11 @@ class DummyNet(object):
         """Kills all processes running in a network namespace"""
 
         for process in self.netns_process_list(name):
-            self.netns_kill_process(name, process)
+
+            try:
+                self.netns_kill_process(name, process)
+            except Exception:
+                self.shell.log.debug(f"Failed to kill process {process} in {name}")
 
     def netns_delete(self, name):
         """Deletes a specific network namespace.

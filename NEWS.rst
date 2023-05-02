@@ -5,7 +5,8 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Minor: Add pid to RunInfo
+* Minor: Make sure we get stdout and stderr if a process exists before monitor
 
 2.1.0
 -----

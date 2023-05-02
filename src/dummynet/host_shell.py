@@ -1,4 +1,6 @@
 import subprocess
+import sys
+import os
 
 from . import run_info
 from . import errors
@@ -20,16 +22,20 @@ class HostShell(object):
         self.sudo = sudo
         self.process_monitor = process_monitor
 
-    def run(self, cmd: str, cwd=None):
+    def run(self, cmd: str, cwd=None, env=None):
         """Run a synchronous command (blocking).
 
         :param cmd: The command to run
         :param cwd: The current working directory i.e. where the command will
                     run
+        :param env: The environment variables to set
         """
 
         if self.sudo:
             cmd = "sudo " + cmd
+
+        if env is None:
+            env = os.environ.copy()
 
         self.log.debug(cmd)
 
@@ -40,6 +46,7 @@ class HostShell(object):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=cwd,
+            env=env,
             shell=True,
             # Get stdout and stderr as text
             text=True,
@@ -53,6 +60,7 @@ class HostShell(object):
         info = run_info.RunInfo(
             cmd=cmd,
             cwd=cwd,
+            pid=process.pid,
             stdout=stdout,
             stderr=stderr,
             returncode=returncode,
@@ -65,7 +73,7 @@ class HostShell(object):
 
         return info
 
-    def run_async(self, cmd: str, daemon=False, cwd=None):
+    def run_async(self, cmd: str, daemon=False, cwd=None, env=None):
         """Run an asynchronous command (non-blocking).
 
         :param cmd: The command to run
@@ -74,6 +82,9 @@ class HostShell(object):
         """
         if self.sudo:
             cmd = "sudo " + cmd
+
+        if env is None:
+            env = os.environ.copy()
 
         self.log.debug(cmd)
 
@@ -84,6 +95,7 @@ class HostShell(object):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=cwd,
+            env=env,
             shell=True,
             # Get stdout and stderr as text
             text=True,
@@ -92,6 +104,7 @@ class HostShell(object):
         info = run_info.RunInfo(
             cmd=cmd,
             cwd=cwd,
+            pid=popen.pid,
             stdout="",
             stderr="",
             returncode=None,
@@ -99,6 +112,6 @@ class HostShell(object):
             is_daemon=daemon,
         )
 
-        self.process_monitor.add_process(popen, info)
+        self.process_monitor.add_process(popen=popen, info=info)
 
         return info

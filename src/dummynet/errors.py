@@ -62,8 +62,4 @@ class ProcessExitError(DummyNetError):
     """
 
     def __init__(self, process):
-        super().__init__(
-            f"Process {process.info.cmd} in {process.info.cwd} exited "
-            f"with {process.popen.returncode} before process monitor "
-            "was started."
-        )
+        super().__init__(f"Process exited before process monitor: {process.info} ")
