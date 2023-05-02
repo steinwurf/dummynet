@@ -14,7 +14,7 @@ def test_run():
 
     log = logging.getLogger("dummynet")
 
-    sudo = False if os.geteuid() == 0 else True
+    sudo = os.getuid() != 0
 
     # The host shell used if we don't have a recording
     shell = HostShell(log=log, sudo=sudo, process_monitor=None)
@@ -89,7 +89,7 @@ def test_run():
 
 def test_run_async():
 
-    sudo = False if os.geteuid() == 0 else True
+    sudo = os.getuid() != 0
 
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
