@@ -152,6 +152,8 @@ def test_run_async():
 
 def test_with_timeout():
 
+    sudo = os.getuid() != 0
+
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
     log.addHandler(logging.StreamHandler())
@@ -160,7 +162,7 @@ def test_with_timeout():
     process_monitor = ProcessMonitor(log=log)
 
     # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=True, process_monitor=process_monitor)
+    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
 
     # DummyNet wrapper that will prevent clean up from happening in playback
     # mode if an exception occurs
@@ -189,11 +191,11 @@ def test_with_timeout():
 
 def test_daemon_exit():
 
+    sudo = os.getuid() != 0
+
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
     log.addHandler(logging.StreamHandler())
-
-    sudo = False if os.geteuid() == 0 else True
 
     # Create a process monitor
     process_monitor = ProcessMonitor(log=log)
@@ -213,11 +215,11 @@ def test_daemon_exit():
 
 def test_all_daemons():
 
+    sudo = os.getuid() != 0
+
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
     log.addHandler(logging.StreamHandler())
-
-    sudo = False if os.geteuid() == 0 else True
 
     # Create a process monitor
     process_monitor = ProcessMonitor(log=log)
