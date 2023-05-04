@@ -35,7 +35,7 @@ class DaemonExitError(DummyNetError):
     """
 
     def __init__(self, process):
-        super().__init__(f"Unexpected daemon exit {process}")
+        super().__init__(f"Unexpected daemon exit: {process.info} ")
 
 
 class AllDaemonsError(DummyNetError):

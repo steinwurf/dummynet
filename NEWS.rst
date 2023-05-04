@@ -5,7 +5,8 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Minor: Make sure we get stdout and stderr if a daemon process exits
+  unexpectedly before monitor
 
 2.2.0
 -----
