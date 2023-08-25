@@ -5,7 +5,8 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Minor: Added ``process_monitor`` property to ``NamespaceShell`` so that
+  it's compatible with ``HostShell``.
 
 2.3.0
 -----

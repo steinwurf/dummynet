@@ -3,6 +3,10 @@ class NamespaceShell:
         self.name = name
         self.shell = shell
 
+    @property
+    def process_monitor(self):
+        return self.shell.process_monitor
+
     def run(self, cmd, cwd=None):
         """Run a command.
         :param cmd: The command to run
