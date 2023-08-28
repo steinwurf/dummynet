@@ -5,7 +5,8 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Patch: Allow processes to output non-UTF-8 characters to stdout and stderr by
+  replacing with '?'.
 
 2.4.0
 -----

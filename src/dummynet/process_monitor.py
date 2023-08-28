@@ -52,7 +52,7 @@ class ProcessMonitor:
             self.log.debug(f"Poller: read {len(data)} bytes from fd {fd}")
 
             # Call the callback
-            self.fds[fd](data.decode("utf-8"))
+            self.fds[fd](data.decode(encoding="utf-8", errors="replace"))
 
         def poll(self, timeout):
             fds = self.poller.poll(timeout)
