@@ -178,7 +178,7 @@ def test_with_timeout():
 
         end_time = time.time() + 2
 
-        while process_monitor.run():
+        while process_monitor.run(timeout=500):
             if time.time() >= end_time:
                 log.debug("Test timeout")
                 process_monitor.stop()
@@ -245,6 +245,40 @@ def test_no_processes():
 
     # Create a process monitor
     process_monitor = ProcessMonitor(log=log)
+
+    # Nothing to do
+    while process_monitor.run():
+        pass
+
+
+def test_hostshell_timeout():
+
+    log = logging.getLogger("dummynet")
+    log.setLevel(logging.DEBUG)
+    log.addHandler(logging.StreamHandler())
+
+    # Create a process monitor
+    process_monitor = ProcessMonitor(log=log)
+
+    # The host shell
+    shell = HostShell(log=log, sudo=False, process_monitor=process_monitor)
+
+    start = time.time()
+    # Check that we get a timeout if we run a command that takes too long
+    with pytest.raises(dummynet.TimeoutError):
+        # Run a command on the host
+        shell.run(cmd="sleep 10", timeout=1100)
+
+    difference = time.time() - start
+
+    # Check that the timeout was more than 1 second
+    assert difference > 1
+
+    # Check that the timeout was less than 2 seconds
+    assert difference < 2
+
+    # Check that we don't get a timeout if we run that runs within the timeout
+    shell.run(cmd="sleep 1", timeout=1200)
 
     # Nothing to do
     while process_monitor.run():
