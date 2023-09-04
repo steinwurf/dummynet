@@ -11,7 +11,6 @@ import os
 
 
 def test_run():
-
     log = logging.getLogger("dummynet")
 
     sudo = os.getuid() != 0
@@ -28,7 +27,6 @@ def test_run():
     net = DummyNet(shell=shell)
 
     try:
-
         # Get a list of the current namespaces
         namespaces = net.netns_list()
         assert namespaces == []
@@ -82,13 +80,11 @@ def test_run():
         out.match(stdout="10 packets transmitted*", stderr=None)
 
     finally:
-
         # Clean up.
         net.cleanup()
 
 
 def test_run_async():
-
     sudo = os.getuid() != 0
 
     log = logging.getLogger("dummynet")
@@ -101,7 +97,6 @@ def test_run_async():
     net = DummyNet(shell=shell)
 
     try:
-
         # Get a list of the current namespaces
         namespaces = net.netns_list()
         assert namespaces == []
@@ -145,13 +140,11 @@ def test_run_async():
         proc1.match(stdout="10 packets transmitted*", stderr=None)
 
     finally:
-
         # Clean up.
         net.cleanup()
 
 
 def test_with_timeout():
-
     sudo = os.getuid() != 0
 
     log = logging.getLogger("dummynet")
@@ -169,7 +162,6 @@ def test_with_timeout():
     net = DummyNet(shell=shell)
 
     try:
-
         # Run a command on the host
         out = net.run(cmd="ping -c 5 8.8.8.8")
         out.match(stdout="5 packets transmitted*", stderr=None)
@@ -184,13 +176,11 @@ def test_with_timeout():
                 process_monitor.stop()
 
     finally:
-
         # Clean up.
         net.cleanup()
 
 
 def test_daemon_exit():
-
     sudo = os.getuid() != 0
 
     log = logging.getLogger("dummynet")
@@ -214,7 +204,6 @@ def test_daemon_exit():
 
 
 def test_all_daemons():
-
     sudo = os.getuid() != 0
 
     log = logging.getLogger("dummynet")
@@ -238,7 +227,6 @@ def test_all_daemons():
 
 
 def test_no_processes():
-
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
     log.addHandler(logging.StreamHandler())
@@ -252,7 +240,6 @@ def test_no_processes():
 
 
 def test_hostshell_timeout():
-
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
     log.addHandler(logging.StreamHandler())

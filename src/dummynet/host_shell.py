@@ -59,7 +59,9 @@ class HostShell(object):
             start = time.time()
             stdout, stderr = process.communicate(timeout=timeout_secs)
             end = time.time()
-            remaining_secs = None if timeout_secs is None else timeout_secs - (end - start)
+            remaining_secs = (
+                None if timeout_secs is None else timeout_secs - (end - start)
+            )
             if remaining_secs is not None and remaining_secs <= 0.0:
                 remaining_secs = 0.1
             returncode = process.wait(timeout=remaining_secs)
@@ -81,7 +83,9 @@ class HostShell(object):
             return info
 
         except subprocess.TimeoutExpired:
-            raise errors.TimeoutError(f"The command '{cmd}' timed out after {timeout} seconds.")
+            raise errors.TimeoutError(
+                f"The command '{cmd}' timed out after {timeout} seconds."
+            )
 
     def run_async(self, cmd: str, daemon=False, cwd=None, env=None):
         """Run an asynchronous command (non-blocking).

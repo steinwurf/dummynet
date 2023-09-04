@@ -15,7 +15,9 @@ class NamespaceShell:
         :param timeout: The timeout in seconds, if None then no timeout
         """
 
-        return self.shell.run(cmd=f"ip netns exec {self.name} {cmd}", cwd=cwd, env=env, timeout=timeout)
+        return self.shell.run(
+            cmd=f"ip netns exec {self.name} {cmd}", cwd=cwd, env=env, timeout=timeout
+        )
 
     def run_async(self, cmd, daemon=False, cwd=None):
         """Run a command in a shell asynchronously.
