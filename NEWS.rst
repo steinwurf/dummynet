@@ -5,7 +5,7 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Minor: Added support for setting a timeout on `HostShell.run` and `NamespaceShell.run`.
 
 2.4.1
 -----

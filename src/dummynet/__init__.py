@@ -7,6 +7,7 @@ from .process import Process
 
 from .errors import DummyNetError
 from .errors import RunInfoError
+from .errors import TimeoutError
 from .errors import MatchError
 from .errors import DaemonExitError
 from .errors import AllDaemonsError
