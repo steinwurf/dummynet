@@ -40,6 +40,8 @@ class SSHShell:
         """Copy a file from the remote host to the local host.
         :param source: The file to copy
         :param target: The destination of the file
+        :param recursive: Whether to copy recursively or not, e.g when copying
+        a directory
         """
 
         return self.shell.run(
@@ -50,6 +52,8 @@ class SSHShell:
         """Copy a file from the local host to the remote host.
         :param source: The file to copy
         :param target: The destination of the file
+        :param recursive: Whether to copy recursively or not, e.g when copying
+        a directory
         """
 
         return self.shell.run(
