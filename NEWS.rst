@@ -5,7 +5,7 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Minor: Added support for starting remote processes with the SSHShell.
 
 2.5.0
 -----

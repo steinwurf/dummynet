@@ -1,6 +1,7 @@
 import re
 from subprocess import CalledProcessError
 from . import namespace_shell
+from . import ssh_shell
 
 
 class DummyNet(object):
@@ -58,7 +59,7 @@ class DummyNet(object):
         output = self.shell.run(cmd=cmd, cwd=None)
 
         parser = re.compile(
-            """
+            r"""
             \d+             # Match one or more digits
             :               # Followed by a colon
             \s              # Followed by a space
@@ -232,7 +233,6 @@ class DummyNet(object):
         """Kills all processes running in a network namespace"""
 
         for process in self.netns_process_list(name):
-
             try:
                 self.netns_kill_process(name, process)
             except Exception:
@@ -297,3 +297,15 @@ class DummyNet(object):
 
         for cleaner in self.cleaners:
             cleaner()
+
+    def ssh(self, user, hostname, port=None):
+        """Creates a new SSHShell object.
+
+        :param user: The user to use when connecting to the host
+        :param hostname: The hostname to connect to
+        :param port: The port to connect to
+        """
+
+        return ssh_shell.SSHShell(
+            shell=self.shell, user=user, hostname=hostname, port=port
+        )
