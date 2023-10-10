@@ -20,6 +20,6 @@ class SSHShell:
         :param cwd: The current working directory i.e. where the command will run
         """
 
-        return self.shell.run_async(cmd=f"{self.cmd_prefix} {cmd}", daemon=daemon, cwd=cwd)
-
-
+        return self.shell.run_async(
+            cmd=f"{self.cmd_prefix} {cmd}", daemon=daemon, cwd=cwd
+        )

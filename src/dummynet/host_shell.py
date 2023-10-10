@@ -1,6 +1,6 @@
 import subprocess
-import sys
 import os
+import time
 
 from . import run_info
 from . import errors
@@ -22,14 +22,16 @@ class HostShell(object):
         self.sudo = sudo
         self.process_monitor = process_monitor
 
-    def run(self, cmd: str, cwd=None, env=None):
-        """Run a synchronous command (blocking).
+    def run(self, cmd: str, cwd=None, env=None, timeout=None):
+        """Run a synchronous command (blocking) with a timeout.
 
         :param cmd: The command to run
-        :param cwd: The current working directory i.e. where the command will
-                    run
+        :param cwd: The current working directory i.e. where the command will run
         :param env: The environment variables to set
+        :param timeout: Maximum time (in milliseconds) to wait for the command to complete
         """
+
+        timeout_secs = timeout / 1000.0 if timeout is not None else None
 
         if self.sudo:
             cmd = "sudo " + cmd
@@ -39,7 +41,6 @@ class HostShell(object):
 
         self.log.debug(cmd)
 
-        # Launch the command
         process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
@@ -52,26 +53,39 @@ class HostShell(object):
             text=True,
         )
 
-        # Here we wait for the process to exit
-        # Warning: this can fail with large numbers of fds!
-        stdout, stderr = process.communicate()
-        returncode = process.wait()
+        try:
+            # Here we wait for the process to exit
+            # Warning: this can fail with large numbers of fds!
+            start = time.time()
+            stdout, stderr = process.communicate(timeout=timeout_secs)
+            end = time.time()
+            remaining_secs = (
+                None if timeout_secs is None else timeout_secs - (end - start)
+            )
+            if remaining_secs is not None and remaining_secs <= 0.0:
+                remaining_secs = 0.1
+            returncode = process.wait(timeout=remaining_secs)
 
-        info = run_info.RunInfo(
-            cmd=cmd,
-            cwd=cwd,
-            pid=process.pid,
-            stdout=stdout,
-            stderr=stderr,
-            returncode=returncode,
-            is_async=False,
-            is_daemon=False,
-        )
+            info = run_info.RunInfo(
+                cmd=cmd,
+                cwd=cwd,
+                pid=process.pid,
+                stdout=stdout,
+                stderr=stderr,
+                returncode=returncode,
+                is_async=False,
+                is_daemon=False,
+            )
 
-        if info.returncode != 0:
-            raise errors.RunInfoError(info=info)
+            if info.returncode != 0:
+                raise errors.RunInfoError(info=info)
 
-        return info
+            return info
+
+        except subprocess.TimeoutExpired:
+            raise errors.TimeoutError(
+                f"The command '{cmd}' timed out after {timeout} seconds."
+            )
 
     def run_async(self, cmd: str, daemon=False, cwd=None, env=None):
         """Run an asynchronous command (non-blocking).

@@ -59,7 +59,7 @@ class DummyNet(object):
         output = self.shell.run(cmd=cmd, cwd=None)
 
         parser = re.compile(
-            """
+            r"""
             \d+             # Match one or more digits
             :               # Followed by a colon
             \s              # Followed by a space
@@ -233,7 +233,6 @@ class DummyNet(object):
         """Kills all processes running in a network namespace"""
 
         for process in self.netns_process_list(name):
-
             try:
                 self.netns_kill_process(name, process)
             except Exception:
@@ -307,4 +306,6 @@ class DummyNet(object):
         :param port: The port to connect to
         """
 
-        return ssh_shell.SSHShell(shell=self.shell, user=user, hostname=hostname, port=port)
+        return ssh_shell.SSHShell(
+            shell=self.shell, user=user, hostname=hostname, port=port
+        )

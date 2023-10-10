@@ -13,6 +13,13 @@ class RunInfoError(DummyNetError):
         self.info = info
 
 
+class TimeoutError(DummyNetError):
+    """Exception for timeout errors"""
+
+    def __init__(self, message):
+        super().__init__(message)
+
+
 class MatchError(DummyNetError):
     """Exception for output match errors"""
 
@@ -35,7 +42,7 @@ class DaemonExitError(DummyNetError):
     """
 
     def __init__(self, process):
-        super().__init__(f"Unexpected daemon exit {process}")
+        super().__init__(f"Unexpected daemon exit: {process.info} ")
 
 
 class AllDaemonsError(DummyNetError):

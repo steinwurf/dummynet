@@ -11,7 +11,6 @@ import os
 
 
 def test_run():
-
     log = logging.getLogger("dummynet")
 
     sudo = os.getuid() != 0
@@ -28,7 +27,6 @@ def test_run():
     net = DummyNet(shell=shell)
 
     try:
-
         # Get a list of the current namespaces
         namespaces = net.netns_list()
         assert namespaces == []
@@ -82,13 +80,11 @@ def test_run():
         out.match(stdout="10 packets transmitted*", stderr=None)
 
     finally:
-
         # Clean up.
         net.cleanup()
 
 
 def test_run_async():
-
     sudo = os.getuid() != 0
 
     log = logging.getLogger("dummynet")
@@ -101,7 +97,6 @@ def test_run_async():
     net = DummyNet(shell=shell)
 
     try:
-
         # Get a list of the current namespaces
         namespaces = net.netns_list()
         assert namespaces == []
@@ -145,13 +140,11 @@ def test_run_async():
         proc1.match(stdout="10 packets transmitted*", stderr=None)
 
     finally:
-
         # Clean up.
         net.cleanup()
 
 
 def test_with_timeout():
-
     sudo = os.getuid() != 0
 
     log = logging.getLogger("dummynet")
@@ -169,7 +162,6 @@ def test_with_timeout():
     net = DummyNet(shell=shell)
 
     try:
-
         # Run a command on the host
         out = net.run(cmd="ping -c 5 8.8.8.8")
         out.match(stdout="5 packets transmitted*", stderr=None)
@@ -178,19 +170,17 @@ def test_with_timeout():
 
         end_time = time.time() + 2
 
-        while process_monitor.run():
+        while process_monitor.run(timeout=500):
             if time.time() >= end_time:
                 log.debug("Test timeout")
                 process_monitor.stop()
 
     finally:
-
         # Clean up.
         net.cleanup()
 
 
 def test_daemon_exit():
-
     sudo = os.getuid() != 0
 
     log = logging.getLogger("dummynet")
@@ -214,7 +204,6 @@ def test_daemon_exit():
 
 
 def test_all_daemons():
-
     sudo = os.getuid() != 0
 
     log = logging.getLogger("dummynet")
@@ -238,7 +227,6 @@ def test_all_daemons():
 
 
 def test_no_processes():
-
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
     log.addHandler(logging.StreamHandler())
@@ -249,6 +237,7 @@ def test_no_processes():
     # Nothing to do
     while process_monitor.run():
         pass
+
 
 def test_ssh():
     log = logging.getLogger("dummynet")
@@ -271,3 +260,36 @@ def test_ssh():
     assert ssh_conn.cmd_prefix == f"ssh {user}@127.0.0.1 -p 22"
 
     net.cleanup()
+
+
+def test_hostshell_timeout():
+    log = logging.getLogger("dummynet")
+    log.setLevel(logging.DEBUG)
+    log.addHandler(logging.StreamHandler())
+
+    # Create a process monitor
+    process_monitor = ProcessMonitor(log=log)
+
+    # The host shell
+    shell = HostShell(log=log, sudo=False, process_monitor=process_monitor)
+
+    start = time.time()
+    # Check that we get a timeout if we run a command that takes too long
+    with pytest.raises(dummynet.TimeoutError):
+        # Run a command on the host
+        shell.run(cmd="sleep 10", timeout=1100)
+
+    difference = time.time() - start
+
+    # Check that the timeout was more than 1 second
+    assert difference > 1
+
+    # Check that the timeout was less than 2 seconds
+    assert difference < 2
+
+    # Check that we don't get a timeout if we run that runs within the timeout
+    shell.run(cmd="sleep 1", timeout=1200)
+
+    # Nothing to do
+    while process_monitor.run():
+        pass

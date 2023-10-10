@@ -7,6 +7,25 @@ Latest
 ------
 * tbd
 
+2.5.0
+-----
+* Minor: Added support for setting a timeout on `HostShell.run` and `NamespaceShell.run`.
+
+2.4.1
+-----
+* Patch: Allow processes to output non-UTF-8 characters to stdout and stderr by
+  replacing with '?'.
+
+2.4.0
+-----
+* Minor: Added ``process_monitor`` property to ``NamespaceShell`` so that
+  it's compatible with ``HostShell``.
+
+2.3.0
+-----
+* Minor: Make sure we get stdout and stderr if a daemon process exits
+  unexpectedly before monitor
+
 2.2.0
 -----
 * Minor: Add pid to RunInfo
