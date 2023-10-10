@@ -11,4 +11,5 @@ Overview of the public API.
    process
    host_shell
    run_info
+   ssh_shell
 
