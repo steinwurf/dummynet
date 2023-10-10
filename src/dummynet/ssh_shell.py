@@ -1,5 +1,8 @@
 class SSHShell:
-    """A shell object for running commands remotely via SSH"""
+    """A shell object for running commands remotely via SSH. If you not wish to
+    have a password prompt with every function call, make sure to distribute
+    your SSH-key to the remote host.
+    """
 
     def __init__(self, shell, user, hostname, port=None):
         """Create a new SSHShell object
@@ -31,4 +34,24 @@ class SSHShell:
 
         return self.shell.run_async(
             cmd=f"{self.cmd_prefix} {cmd}", daemon=daemon, cwd=cwd
+        )
+
+    def get(self, source, target, recursive=False):
+        """Copy a file from the remote host to the local host.
+        :param source: The file to copy
+        :param target: The destination of the file
+        """
+
+        return self.shell.run(
+            cmd=f"scp {'-r ' if recursive else ''}{self.user}@{self.hostname}:{source} {target}"
+        )
+
+    def put(self, source, target, recursive=False):
+        """Copy a file from the local host to the remote host.
+        :param source: The file to copy
+        :param target: The destination of the file
+        """
+
+        return self.shell.run(
+            cmd=f"scp {'-r ' if recursive else ''}{source} {self.user}@{self.hostname}:{target}"
         )
