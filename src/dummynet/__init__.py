@@ -4,6 +4,7 @@ from .namespace_shell import NamespaceShell
 from .host_shell import HostShell
 from .process_monitor import ProcessMonitor
 from .process import Process
+from .ssh_shell import SSHShell
 
 from .errors import DummyNetError
 from .errors import RunInfoError

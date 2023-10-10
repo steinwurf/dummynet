@@ -249,3 +249,25 @@ def test_no_processes():
     # Nothing to do
     while process_monitor.run():
         pass
+
+def test_ssh():
+    log = logging.getLogger("dummynet")
+    log.setLevel(logging.DEBUG)
+    log.addHandler(logging.StreamHandler())
+    # The host shell used if we don't have a recording
+    shell = HostShell(log=log, sudo=False, process_monitor=None)
+
+    user = shell.run("whoami").stdout.strip()
+
+    # DummyNet wrapper that will prevent clean up from happening in playback
+    # mode if an exception occurs
+    net = DummyNet(shell=shell)
+
+    ssh_conn = net.ssh(user, "127.0.0.1")
+
+    assert ssh_conn.user == user
+    assert ssh_conn.hostname == "127.0.0.1"
+    assert ssh_conn.port == 22
+    assert ssh_conn.cmd_prefix == f"ssh {user}@127.0.0.1 -p 22"
+
+    net.cleanup()

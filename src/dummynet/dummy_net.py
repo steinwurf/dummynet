@@ -1,6 +1,7 @@
 import re
 from subprocess import CalledProcessError
 from . import namespace_shell
+from . import ssh_shell
 
 
 class DummyNet(object):
@@ -297,3 +298,13 @@ class DummyNet(object):
 
         for cleaner in self.cleaners:
             cleaner()
+
+    def ssh(self, user, hostname, port=None):
+        """Creates a new SSHShell object.
+
+        :param user: The user to use when connecting to the host
+        :param hostname: The hostname to connect to
+        :param port: The port to connect to
+        """
+
+        return ssh_shell.SSHShell(shell=self.shell, user=user, hostname=hostname, port=port)
