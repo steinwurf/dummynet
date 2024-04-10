@@ -1,5 +1,71 @@
 import dummynet
 import logging
+import os
+import subprocess
+
+
+def make_cgroup(name):
+    """
+    Create a cgroup with the specified name.
+
+    Args:
+        name (str): The name of the cgroup.
+
+    Returns:
+        None
+
+    """
+    subprocess.run(["sudo", "mkdir", f"/sys/fs/cgroup/{name}"])
+    return None
+
+def delete_cgroup(name):
+    """
+    Delete the specified cgroup.
+
+    Args:
+        name (str): The name of the cgroup.
+
+    Returns:
+        None
+
+    """
+    subprocess.run(["sudo", "rmdir", f"/sys/fs/cgroup/{name}"])
+    return None
+
+def add_cgroup_controller(name, controller):
+    """
+    Add a cgroup controller to a specific cgroup.
+
+    Args:
+        name (str): The name of the cgroup.
+        controller (str): The name of the cgroup controller.
+
+    Example:
+        add_cgroup_controller("my_cgroup", "cpu")
+        # This will add the "cpu" controller to the "my_cgroup" cgroup.
+
+    Returns:
+        None
+
+    """
+    subprocess.run(["sudo", "echo", f"'+{controller}'", ">", "/sys/fs/cgroup/cgroup.subtree_control"])
+    return None
+
+def add_to_cgroup(name, pid):
+    """
+    Add a process to the specified cgroup.
+
+    Args:
+        name (str): The name of the cgroup.
+        pid (int): The process ID.
+
+    Returns:
+        None
+
+    """
+    subprocess.run(["sudo", "echo", f"{pid}", f"/sys/fs/cgroup/{name}/cgroup.procs"])
+    return None
+
 
 
 def run():
@@ -70,4 +136,17 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    # Get the current process ID
+    pyscript_pid = os.getpid()
+    print("PID:", pyscript_pid)
+    # make_cgroup("test")    
+    add_cgroup_controller("test", "cpu")    
+    
+    # run()
+
+# TODO: - Fix add controller function
+#       - Add process to cgroup
+#       - Delete cgroup 
+#       - Explore options of starting a process inside a cgroup
+#       - Cgroup has 'namespace' module?
+#       - Multiple cgroups or just one?
