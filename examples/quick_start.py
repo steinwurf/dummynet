@@ -4,69 +4,84 @@ import os
 import subprocess
 
 
-def make_cgroup(name):
-    """
-    Create a cgroup with the specified name.
+class CgroupManager:
+    def __init__(self, name):
+        self.name = name
 
-    Args:
-        name (str): The name of the cgroup.
+    def make_cgroup(self):
+        """
+        Create a cgroup with the specified name.
 
-    Returns:
-        None
+        Args:
+            name (str): The name of the cgroup.
 
-    """
-    subprocess.run(["sudo", "mkdir", f"/sys/fs/cgroup/{name}"])
-    return None
+        Returns:
+            None
+        """
+        subprocess.run(["sudo", "mkdir", f"/sys/fs/cgroup/{self.name}"])
 
-def delete_cgroup(name):
-    """
-    Delete the specified cgroup.
+    def delete_cgroup(self):
+        """
+        Delete the specified cgroup.
 
-    Args:
-        name (str): The name of the cgroup.
+        Args:
+            name (str): The name of the cgroup.
 
-    Returns:
-        None
+        Returns:
+            None
+        """
+        subprocess.run(["sudo", "rmdir", f"/sys/fs/cgroup/{self.name}"])
 
-    """
-    subprocess.run(["sudo", "rmdir", f"/sys/fs/cgroup/{name}"])
-    return None
+    def add_cgroup_controller(self, controller):
+        """
+        Add a cgroup controller to a specific cgroup.
 
-def add_cgroup_controller(name, controller):
-    """
-    Add a cgroup controller to a specific cgroup.
+        Args:
+            controller (str): The name of the cgroup controller.
 
-    Args:
-        name (str): The name of the cgroup.
-        controller (str): The name of the cgroup controller.
+        Example:
+            add_cgroup_controller("my_cgroup", "cpu")
+            # This will add the "cpu" controller to the "my_cgroup" cgroup.
 
-    Example:
-        add_cgroup_controller("my_cgroup", "cpu")
-        # This will add the "cpu" controller to the "my_cgroup" cgroup.
+        Returns:
+            None
+        """
+        with open("/sys/fs/cgroup/cgroup.subtree_control", "w") as f:
+            f.write(f"+{controller}")
 
-    Returns:
-        None
+    def add_to_cgroup(self, pid):
+        """
+        Add a process to the specified cgroup.
 
-    """
-    subprocess.run(["sudo", "echo", f"'+{controller}'", ">", "/sys/fs/cgroup/cgroup.subtree_control"])
-    return None
+        Args:
+            pid (int): The process ID.
 
-def add_to_cgroup(name, pid):
-    """
-    Add a process to the specified cgroup.
+        Returns:
+            None
+        """
+        with open(f"/sys/fs/cgroup/{self.name}/cgroup.procs", "w") as f:
+            f.write(f"{pid}")
 
-    Args:
-        name (str): The name of the cgroup.
-        pid (int): The process ID.
+    def set_cpu_limit(self, limit=0.5):
+        """
+        Set the CPU usage limit for a specific process in the cgroup.
 
-    Returns:
-        None
+        Args:
+            pid (int): The process ID.
+            limit (int): The CPU usage limit as a percentage.
 
-    """
-    subprocess.run(["sudo", "echo", f"{pid}", f"/sys/fs/cgroup/{name}/cgroup.procs"])
-    return None
+        Returns:
+            None
+        """
+        with open(f"/sys/fs/cgroup/{self.name}/cpu.max", "w") as f:
+            f.write(f'{limit*100000} 100000')  # Convert limit to a percentage
 
 
+# test = CgroupManager("test_group")
+# test.add_cgroup_controller("cpu")
+# test.add_to_cgroup(pid=42)
+# test.set_cpu_limit()
+# test.delete_cgroup()
 
 def run():
     log = logging.getLogger("dummynet")
@@ -77,6 +92,8 @@ def run():
     shell = dummynet.HostShell(log=log, sudo=True, process_monitor=process_monitor)
 
     net = dummynet.DummyNet(shell=shell)
+
+    test_cgroup = CgroupManager("test_cgroup")
 
     try:
 
@@ -108,6 +125,13 @@ def run():
         proc0 = demo0.run_async(cmd="ping -c 20 10.0.0.2", daemon=True)
         proc1 = demo1.run_async(cmd="ping -c 10 10.0.0.1")
 
+
+        test_cgroup.make_cgroup()
+        test_cgroup.add_cgroup_controller("cpu")
+        test_cgroup.add_to_cgroup(pid=proc0.pid)
+        test_cgroup.add_to_cgroup(pid=proc1.pid)
+        test_cgroup.set_cpu_limit(limit=0.5)
+
         # Print output as we go (optional)
         def _proc0_stdout(data):
             print("proc0: {}".format(data))
@@ -136,17 +160,4 @@ def run():
 
 
 if __name__ == "__main__":
-    # Get the current process ID
-    pyscript_pid = os.getpid()
-    print("PID:", pyscript_pid)
-    # make_cgroup("test")    
-    add_cgroup_controller("test", "cpu")    
-    
-    # run()
-
-# TODO: - Fix add controller function
-#       - Add process to cgroup
-#       - Delete cgroup 
-#       - Explore options of starting a process inside a cgroup
-#       - Cgroup has 'namespace' module?
-#       - Multiple cgroups or just one?
+    run()
