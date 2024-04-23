@@ -1,6 +1,6 @@
 import dummynet
 import logging
-
+import os
 
 def run():
     log = logging.getLogger("dummynet")
@@ -12,14 +12,9 @@ def run():
 
     net = dummynet.DummyNet(shell=shell)
 
-    test_cgroup = dummynet.CgroupManager("test_cgroup")
-
+    test_cgroup = dummynet.CgroupManager("test_cgroup", shell, log=log, controllers="cpu", limit=0.5)
 
     try:
-        # Create a cgroup and add the "cpu" limiter to it.
-        test_cgroup.make_cgroup()
-        test_cgroup.add_cgroup_controller("cpu")
-        test_cgroup.set_cpu_limit(limit=0.01)
 
         # Get a list of the current namespaces
         namespaces = net.netns_list()
@@ -49,9 +44,9 @@ def run():
         proc0 = demo0.run_async(cmd="ping -c 20 10.0.0.2", daemon=True)
         proc1 = demo1.run_async(cmd="ping -c 10 10.0.0.1")
         
-        # Add the processes to the cgroup.
-        test_cgroup.add_to_cgroup(pid=proc0.pid)
-        test_cgroup.add_to_cgroup(pid=proc1.pid)
+        # # Add the processes to the cgroup.
+        # test_cgroup.add_to_cgroup(pid=proc0.pid)
+        # test_cgroup.add_to_cgroup(pid=proc1.pid)
 
         # Print output as we go (optional)
         def _proc0_stdout(data):
