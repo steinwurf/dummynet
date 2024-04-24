@@ -1,17 +1,25 @@
 import dummynet
 import logging
-import os
+import sys
+import argparse
 
 def run():
+
+    parser = argparse.ArgumentParser(description="Program with debugger option")
+    parser.add_argument("--debug", action="store_true", help="Enable log debugger")
+    args = parser.parse_args()
+
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
+    
+    if args.debug:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.DEBUG)
+        log.addHandler(console_handler)
 
     process_monitor = dummynet.ProcessMonitor(log=log)
-
     shell = dummynet.HostShell(log=log, sudo=True, process_monitor=process_monitor)
-
     net = dummynet.DummyNet(shell=shell)
-
     test_cgroup = dummynet.CgroupManager("test_cgroup", shell, log=log, controllers="cpu", limit=0.5)
 
     try:
