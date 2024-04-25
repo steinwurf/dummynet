@@ -2,6 +2,8 @@ import dummynet
 import logging
 import sys
 import argparse
+import os
+
 
 def run():
 
@@ -20,7 +22,15 @@ def run():
     process_monitor = dummynet.ProcessMonitor(log=log)
     shell = dummynet.HostShell(log=log, sudo=True, process_monitor=process_monitor)
     net = dummynet.DummyNet(shell=shell)
-    test_cgroup = dummynet.CgroupManager("test_cgroup", shell, log=log, controllers="cpu", limit=0.5)
+
+    test_cgroup = dummynet.CgroupManager(
+        name="test_cgroup",
+        shell=shell,
+        log=log,
+        controllers={"cpu.max": 0.5, "memory.high": 200000000},
+        pid=os.getpid(), # pid to be controled by the cgroup
+    )
+    test_cgroup.build_cgroup()
 
     try:
 
@@ -53,8 +63,8 @@ def run():
         proc1 = demo1.run_async(cmd="ping -c 10 10.0.0.1")
         
         # # Add the processes to the cgroup.
-        # test_cgroup.add_to_cgroup(pid=proc0.pid)
-        # test_cgroup.add_to_cgroup(pid=proc1.pid)
+        # test_cgroup0.add_to_cgroup(pid=proc0.pid)
+        # test_cgroup1.add_to_cgroup(pid=proc1.pid)
 
         # Print output as we go (optional)
         def _proc0_stdout(data):
@@ -81,8 +91,7 @@ def run():
 
         # Clean up.
         net.cleanup()
-        # Delete cgroup
-        # test_cgroup.delete_cgroup()
+        test_cgroup.cleanup()
 
 
 if __name__ == "__main__":
