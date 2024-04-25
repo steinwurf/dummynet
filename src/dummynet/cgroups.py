@@ -11,8 +11,8 @@ import dummynet
 # DONE  - Add a way to say what to limit by how much (e.g. limit all processes in cgroup to 50% CPU, limit process 1 to 20% CPU, etc.)
 # DONE  - Fix hardcoded assert in set_limit
 # DONE  - Make static method that abstract building the cgroups
-#       - Optimize to not check 2 times if pid is list or not in cleanup and add_proc
-#       - Fix the cgroup cleanup by removing pid from cgroup.procs and deleteing cgroup
+# DONE  - Optimize to not check 2 times if pid is list or not in cleanup and add_proc
+# DONE  - Fix the cgroup cleanup by removing pid from cgroup.procs and deleting cgroup
 #       - update NEWS.rst
 #       - Add tests -> /waf build --run_tests | explore pytest and how to run tests from /tests
 #       - Add CgroupManager to the documentation with an example
