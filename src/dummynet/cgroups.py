@@ -1,5 +1,6 @@
 import os
 import dummynet
+import logging
 
 # TODO:
 # DONE  - pass logger in instead of prints -> It doesn't do anything? !Explore!
@@ -32,6 +33,8 @@ class CgroupManager:
         pid (int, optional): The process ID to add to the cgroup. Defaults to None.
 
     Methods:
+        input_validation(): Validate the input arguments.
+        build_cgroup(): Plug-and-play cgroup generator.
         make_cgroup(): Create a cgroup with the specified name.
         delete_cgroup(): Delete the specified cgroup.
         add_cgroup_controller(): Add a cgroup controller to the cgroup.
@@ -54,22 +57,13 @@ class CgroupManager:
         self.pid = pid
         self.default_path = default_path
         self.cgroup_pth = os.path.join(self.default_path, self.name)
-
-        # Initial clean-up
-        # self.delete_cgroup()
-        # self.make_cgroup()
-
-        # self.add_cgroup_controller()
-        # self.set_limit()
-
-        # if self.pid:
-        #     self.add_to_cgroup(self.pid)
     
     def build_cgroup(self):
         """
         Build cgroup by calling the following methods:
         - delete_cgroup
         - make_cgroup
+        - input_validation
         - add_cgroup_controller
         - set_limit
         - add_to_cgroup.
@@ -79,6 +73,7 @@ class CgroupManager:
         """
         self.delete_cgroup()
         self.make_cgroup()
+        self.input_validation()
         self.add_cgroup_controller()
         self.set_limit()
         if self.pid:
@@ -94,7 +89,10 @@ class CgroupManager:
         try:
             self.shell.run(cmd=f"rmdir {self.cgroup_pth}")
         except dummynet.errors.RunInfoError as e:
-            self.log.info(f"Error: {e}\nContinuing...")
+            if "No such file or directory" in e.info.stderr:
+                self.log.info(f"Cgroup {self.name} does not exist. Skipping deletion.\n")
+            if "Device or resource busy" in e.info.stderr:
+                self.log.info(f"Cgroup {self.name} failed to delete. Stop running processes before deletion.\n")
         else:
             self.log.info(f"Cgroup {self.name} deleted.\n")
 
@@ -110,6 +108,24 @@ class CgroupManager:
         else:
             self.shell.run(cmd=f"mkdir {self.cgroup_pth}")
             self.log.info(f"Cgroup {self.name} created.")
+
+    def input_validation(self):
+        """
+        Validate the input arguments.
+
+        Returns:
+            None
+        """
+        assert isinstance(self.name, str), "Name must be a string."
+        assert isinstance(self.shell, dummynet.HostShell), "Shell must be a dummynet.HostShell object."
+        assert isinstance(self.log, logging.Logger), "Log must be a logging.Logger object."
+        assert isinstance(self.default_path, str), "Default path must be a string."
+        assert isinstance(self.controllers, dict), "Controllers must be a dictionary."
+        assert isinstance(self.pid, (int, list, type(None))), "PID must be an integer, list or None."
+
+        controller_list = os.listdir(self.cgroup_pth)
+        for key in self.controllers.keys():
+            assert key in controller_list, f"Controller {key} not found in cgroup directory."
 
     def add_cgroup_controller(self):
         """
@@ -134,9 +150,10 @@ class CgroupManager:
         # Set limits for each controller
         for key, value in self.controllers.items():
             if key.startswith("cpu."):
-                assert 0 < value <= 1, "Limit must be in range (0, 1]."
+                assert 0 < value <= 1, f"{key} must be in range (0, 1]."
                 self.shell.run(cmd=f"echo '{int(value*100000)} 100000' > {self.cgroup_pth}/{key}")
             elif key.startswith("memory."):
+                assert value > 0, f"{key} must be greater than 0."
                 self.shell.run(cmd=f"echo '{value}' > {self.cgroup_pth}/{key}")
 
     def add_to_cgroup(self, pid):
@@ -151,10 +168,17 @@ class CgroupManager:
         """
         if isinstance(pid, int):
             pid = [pid]
-    
-        self.pid = pid
-        for p in pid:
-            self.shell.run(cmd=f"echo {p} > {self.cgroup_pth}/cgroup.procs")
+        
+        # Check if pid exists
+        try:
+            for p in pid:
+                os.kill(p, 0)
+        except OSError:
+            assert False, f"Process {p} is not running."
+        else:
+            self.pid = pid
+            for p in pid:
+                self.shell.run(cmd=f"echo {p} > {self.cgroup_pth}/cgroup.procs")
 
     def cleanup(self):
         """
@@ -165,15 +189,6 @@ class CgroupManager:
         """
         for p in self.pid: 
             self.shell.run(cmd=f"echo {p} > {self.default_path}/cgroup.procs")
-            self.delete_cgroup()
-
-# if __name__ == "__main__":
-#     shell = dummynet.HostShell(log=log, sudo=True)
-#     log = logging.getLogger("dummynet")
-#     log.setLevel(logging.DEBUG)
-
-#     test = CgroupManager("test_group", shell, log=log)
-#     test.add_cgroup_controller(["cpu"])
-#     # test.add_to_cgroup(pid=48820)
-#     # test.set_limit()
-#     # test.delete_cgroup()
+        self.shell.run(cmd=f"echo 1 > {self.cgroup_pth}/cgroup.kill")
+        self.delete_cgroup()
+        self.log.info(f"Cleanup complete.")

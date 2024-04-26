@@ -270,3 +270,70 @@ def test_hostshell_timeout():
     # Nothing to do
     while process_monitor.run():
         pass
+
+
+# TODO:   - Test pid doesn't exist
+#         - Test controller doesn't exist, wrong value, wrong type
+#         - Test make/delete cgroup didn't work
+#         - Test cleanup didn't work
+#         - Test set_limit didn't work, wrong limit
+#         - Happy path vs Sad path, research!
+
+
+def test_cgroups():
+    log = logging.getLogger("dummynet")
+    log.setLevel(logging.DEBUG)
+    log.addHandler(logging.StreamHandler())
+
+    sudo = os.getuid() != 0
+
+    process_monitor = ProcessMonitor(log=log)
+    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+    net = DummyNet(shell=shell)
+
+    test_cgroup = dummynet.CgroupManager(
+        name="test_cgroup",
+        shell=shell,
+        log=log,
+        default_path="/sys/fs/cgroup",
+        controllers={"cpu.max": 0.5, "memory.high": 200000000},
+        pid=None,  # pid to be controled by the cgroup
+    )
+
+    try:
+        test_cgroup.delete_cgroup()
+    except dummynet.errors.RunInfoError as e:
+        if "Permission denied" in e.info.stderr:
+            raise Exception("Permission denied. Run as root.")
+        if "Directory not empty" in e.info.stderr:
+            raise Exception(f"Cgroup directory not empty. Remove all processes from {test_cgroup}.")
+    else:
+        log.debug(f"Deleted cgroup {test_cgroup} --> test successful.\n")
+
+    try:
+        test_cgroup.make_cgroup()
+    except dummynet.errors.RunInfoError as e:
+        assert e.info.returncode == 0, "Cgroup not created." 
+
+    try:
+        test_cgroup.input_validation()
+    except (AssertionError, FileNotFoundError) as e:
+        raise Exception(f"Error validating input: {e}")
+    else:    
+        test_cgroup.add_cgroup_controller()
+    
+    try:
+        test_cgroup.set_limit()
+    except AssertionError as e:
+        raise Exception(f"Error setting limit: {e}") # Error caught? Continuing...?
+    
+    try:
+        test_cgroup.add_to_cgroup(pid=os.getpid())
+    except AssertionError as e:
+        raise Exception(f"PID  non-existant: {e}") # Error caught? Continuing...?
+
+
+
+if __name__ == "__main__":
+    test_cgroups()
+    print("All tests passed!")
