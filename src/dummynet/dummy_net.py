@@ -1,6 +1,8 @@
 import re
 from subprocess import CalledProcessError
 from . import namespace_shell
+from dummynet.cgroups import CGroup
+from logging import Logger
 
 
 class DummyNet(object):
@@ -15,6 +17,7 @@ class DummyNet(object):
         :param shell: The shell to use for running commands
         """
         self.shell = shell
+        self.cgroups = []
         self.cleaners = []
 
     def link_veth_add(self, p1_name, p2_name):
@@ -297,3 +300,21 @@ class DummyNet(object):
 
         for cleaner in self.cleaners:
             cleaner()
+
+
+# TODO: 
+#       - Add cleanup (for c in self.cgroups: c.cleanup())
+
+    def add_cgroup(self,
+                   name: str,
+                   shell,
+                   log=Logger,
+                   default_path: str = "/sys/fs/cgroup",
+                   controllers: dict = {"cpu.max": None,
+                                      "memory.high": None},
+                 pid=None):
+        """Creates a new cgroup object"""
+        cgroup = CGroup(name=name, shell=shell, log=log, default_path=default_path, controllers=controllers, pid=pid)
+        self.cgroups.append(cgroup)
+        return cgroup
+    

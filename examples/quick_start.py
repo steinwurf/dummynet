@@ -23,15 +23,9 @@ def run():
     shell = dummynet.HostShell(log=log, sudo=True, process_monitor=process_monitor)
     net = dummynet.DummyNet(shell=shell)
 
-    test_cgroup = dummynet.CgroupManager(
-        name="test_cgroup",
-        shell=shell,
-        log=log,
-        controllers={"cpu.max": 0.5, "memory.high": 200000000},
-        pid=os.getpid(), # pid to be controled by the cgroup
-    )
-    test_cgroup.build_cgroup()
-
+    cgroup = net.add_cgroup(name="test_cgroup", controllers={"cpu.max": 0.5, "memory.high": 200000000})
+    cgroup.build_cgroup()
+    
     try:
 
         # Get a list of the current namespaces

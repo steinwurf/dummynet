@@ -2,25 +2,8 @@ import os
 import dummynet
 import logging
 
-# TODO:
-# DONE  - pass logger in instead of prints -> It doesn't do anything? !Explore!
-# DONE  - debugger in namespace
-# DONE  - Use shell as argument to CgroupManager
-# DONE  - Restructure the code, add args to CgroupManager init (controllers, limits, etc.)
-# DONE  - Add more cgroup controllers (memory, io, etc.) -> Make a dict like; controller: "limit_value"
-# DONE  - Add more cgroup functionality (put whole script under a cgroup, more granular control, etc.) -> Find a way to delete cgroup when script is done
-# DONE  - Add a way to say what to limit by how much (e.g. limit all processes in cgroup to 50% CPU, limit process 1 to 20% CPU, etc.)
-# DONE  - Fix hardcoded assert in set_limit
-# DONE  - Make static method that abstract building the cgroups
-# DONE  - Optimize to not check 2 times if pid is list or not in cleanup and add_proc
-# DONE  - Fix the cgroup cleanup by removing pid from cgroup.procs and deleting cgroup
-#       - update NEWS.rst
-#       - Add tests -> /waf build --run_tests | explore pytest and how to run tests from /tests
-#       - Add CgroupManager to the documentation with an example
-#       - Release and be happy.
 
-
-class CgroupManager:
+class CGroup:
     """
     A class for managing cgroups.
 
