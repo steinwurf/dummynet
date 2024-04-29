@@ -272,14 +272,6 @@ def test_hostshell_timeout():
         pass
 
 
-# TODO:   - Test pid doesn't exist
-#         - Test controller doesn't exist, wrong value, wrong type
-#         - Test make/delete cgroup didn't work
-#         - Test cleanup didn't work
-#         - Test set_limit didn't work, wrong limit
-#         - Happy path vs Sad path, research!
-
-
 def test_cgroups():
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
@@ -291,16 +283,37 @@ def test_cgroups():
     shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
     net = DummyNet(shell=shell)
 
+    # Sad path
     test_cgroup = dummynet.CgroupManager(
         name="test_cgroup",
         shell=shell,
         log=log,
         default_path="/sys/fs/cgroup",
+        controllers={"cpu.wrongname": 0.5, "memory.high": -200000000},
+        pid=12345,
+    )
+
+    # Happy path
+    test_cgroup_build = dummynet.CgroupManager(
+        name="test_cgroup_build",
+        shell=shell,
+        log=log,
+        default_path="/sys/fs/cgroup",
         controllers={"cpu.max": 0.5, "memory.high": 200000000},
-        pid=None,  # pid to be controled by the cgroup
+        pid=os.getpid(),  # pid to be controled by the cgroup
     )
 
     try:
+        log.debug(f"Testing cgroup: {test_cgroup_build.name} --> Happy path.\n" + "="*70 + "\n")
+        test_cgroup_build.build_cgroup()
+        test_cgroup_build.cleanup()
+    except dummynet.errors.RunInfoError as e:
+        raise Exception(f"Error building cgroup: {e}")
+    else:
+        log.debug(f"Cgroup built: {test_cgroup_build.name} --> test successful.\n" + "="*70 + "\n")
+
+    try:
+        log.debug(f"Testing cgroup: {test_cgroup.name} --> Sad path.\n" + "="*70 + "\n")
         test_cgroup.delete_cgroup()
     except dummynet.errors.RunInfoError as e:
         if "Permission denied" in e.info.stderr:
@@ -308,32 +321,48 @@ def test_cgroups():
         if "Directory not empty" in e.info.stderr:
             raise Exception(f"Cgroup directory not empty. Remove all processes from {test_cgroup}.")
     else:
-        log.debug(f"Deleted cgroup {test_cgroup} --> test successful.\n")
+        log.debug(f"Cgroup deleted: {test_cgroup.name} --> test successful.\n" + "-"*70 + "\n")
 
     try:
         test_cgroup.make_cgroup()
     except dummynet.errors.RunInfoError as e:
-        assert e.info.returncode == 0, "Cgroup not created." 
+        assert e.info.returncode != 0, "Cgroup not created." 
+    else:
+        log.debug(f"Cgroup made: {test_cgroup.name} --> test successful.\n" + "-"*70 + "\n")
 
     try:
         test_cgroup.input_validation()
     except (AssertionError, FileNotFoundError) as e:
         raise Exception(f"Error validating input: {e}")
-    else:    
-        test_cgroup.add_cgroup_controller()
-    
+    else:
+        log.debug(f"Input validated. --> test successful.\n" + "-"*70 + "\n")
+
     try:
+        test_cgroup.add_cgroup_controller()
+    except (dummynet.errors.RunInfoError, AssertionError) as e:    
+        log.debug(f"Error caught: {e}\n Continuing...\n")
+    else:
+        log.debug(f"Controllers added: {list(test_cgroup.controllers.keys())} --> test successful.\n" + "-"*70 + "\n")
+
+    try:
+        test_cgroup.controllers = {"cpu.max": 0, "memory.high": -200000000}
         test_cgroup.set_limit()
     except AssertionError as e:
-        raise Exception(f"Error setting limit: {e}") # Error caught? Continuing...?
-    
+        log.debug(f"Error caught while setting limit: {e}\n Continuing...\n" + "-"*70 + "\n")
+    else:
+        log.debug(f"Limits set: {list(test_cgroup.controllers.values())} --> test successful.\n" + "-"*70 + "\n")
+
     try:
-        test_cgroup.add_to_cgroup(pid=os.getpid())
+        test_cgroup.pid = [12345]
+        test_cgroup.add_to_cgroup(pid=test_cgroup.pid)
     except AssertionError as e:
-        raise Exception(f"PID  non-existant: {e}") # Error caught? Continuing...?
+        log.debug(f"Error caught for non-existant PID: {e}\n Continuing...\n" + "-"*70 + "\n")
+    else:
+        log.debug(f"PID {test_cgroup.pid} added to cgroup: {test_cgroup.name} --> test successful.\n" + "-"*70 + "\n")
 
-
-
-if __name__ == "__main__":
-    test_cgroups()
-    print("All tests passed!")
+    try:
+        test_cgroup.cleanup()
+    except dummynet.errors.RunInfoError as e:
+        log.debug(f"Error cleaning up: {e.info.stderr}\n Continuing...\n" + "-"*70 + "\n")
+    else:
+        log.debug(f"Cgroup cleaned: {test_cgroup.name} --> test successful.\n" + "-"*70 + "\n")

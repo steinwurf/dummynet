@@ -40,6 +40,19 @@ class CgroupManager:
         add_cgroup_controller(): Add a cgroup controller to the cgroup.
         add_to_cgroup(pid): Add a process to the specified cgroup.
         set_limit(): Set the CPU usage limit for a specific process in the cgroup.
+
+    Example:
+        >>> test_cgroup = dummynet.CgroupManager(
+        name="test_cgroup",
+        shell=shell,
+        log=log,
+        default_path="/sys/fs/cgroup",
+        controllers={"cpu.max": 0.5, "memory.high": 200000000},
+        pid=os.getpid(),
+        )
+        >>> test_cgroup_build.build_cgroup()
+        >>> test_cgroup_build.cleanup()
+
     """
 
     def __init__(self, name: str,
@@ -123,23 +136,32 @@ class CgroupManager:
         assert isinstance(self.controllers, dict), "Controllers must be a dictionary."
         assert isinstance(self.pid, (int, list, type(None))), "PID must be an integer, list or None."
 
-        controller_list = os.listdir(self.cgroup_pth)
-        for key in self.controllers.keys():
-            assert key in controller_list, f"Controller {key} not found in cgroup directory."
-
     def add_cgroup_controller(self):
         """
         Add a cgroup controller to the cgroup.
+
+        Available controllers:
+
+        (cpuset, cpu, io, memory, hugetlb, pids, rdma, misc)
 
         Returns:
             None
         """
         for controller in self.controllers.keys():
             self.shell.run(cmd=f"echo '+{controller.split('.')[0]}' > {self.default_path}/cgroup.subtree_control")
-                
+        
+        controller_list = os.listdir(self.cgroup_pth)
+        for key in self.controllers.keys():
+            assert key in controller_list, f"Controller {key} not found in cgroup directory."
+
     def set_limit(self):
         """
         Set the usage limit for a specific controller in the cgroup.
+
+        Available controllers to limit:
+
+        - cpu (percentage) -> (0, 1]
+        - memory (bytes) -> (0, max]
 
         Returns:
             None
@@ -158,7 +180,7 @@ class CgroupManager:
 
     def add_to_cgroup(self, pid):
         """
-        Add a process to the specified cgroup.
+        Add a Process to the specified cgroup via its PID.
 
         Args:
             pid (int): The process ID.
@@ -187,8 +209,9 @@ class CgroupManager:
         Returns:
             None
         """
-        for p in self.pid: 
-            self.shell.run(cmd=f"echo {p} > {self.default_path}/cgroup.procs")
-        self.shell.run(cmd=f"echo 1 > {self.cgroup_pth}/cgroup.kill")
+        if self.pid:
+            for p in self.pid: 
+                self.shell.run(cmd=f"echo {p} > {self.default_path}/cgroup.procs")
+            self.shell.run(cmd=f"echo 1 > {self.cgroup_pth}/cgroup.kill")
         self.delete_cgroup()
         self.log.info(f"Cleanup complete.")
