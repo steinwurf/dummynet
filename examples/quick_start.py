@@ -2,7 +2,6 @@ import dummynet
 import logging
 import sys
 import argparse
-import os
 
 
 def run():
