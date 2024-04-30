@@ -301,10 +301,6 @@ class DummyNet(object):
         for cleaner in self.cleaners:
             cleaner()
 
-
-# TODO: 
-#       - Add cleanup (for c in self.cgroups: c.cleanup())
-
     def add_cgroup(self,
                    name: str,
                    shell,
@@ -312,14 +308,25 @@ class DummyNet(object):
                    default_path: str = "/sys/fs/cgroup",
                    controllers: dict = {"cpu.max": None,
                                       "memory.high": None},
-                 pid=None):
-        """Creates a new cgroup object"""
+                   pid=None):
+        """
+        Creates a new cgroup object.
+
+        :param name: The name of the cgroup.
+        :param shell: The shell object used for executing shell commands.
+        :param log: The log object used for logging messages.
+        :param default_path: The default path for cgroups. Defaults to "/sys/fs/cgroup".
+        :param controllers: Dictionary of controllers as keys and limits as values. Defaults to {"cpu.max": None, "memory.high": None}.
+        :param pid: The process ID to add to the cgroup. Defaults to None.
+        
+        :return: A CGroup object.
+        """
         cgroup = CGroup(name=name, shell=shell, log=log, default_path=default_path, controllers=controllers, pid=pid)
         self.cgroups.append(cgroup)
         return cgroup
     
     def cgroup_cleanup(self):
-        """Cleans up all the created cgroups"""
+        """Cleans up all the created cgroups."""
         for c in self.cgroups:
             c.hard_clean()
     

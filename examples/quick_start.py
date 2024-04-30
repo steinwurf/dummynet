@@ -26,15 +26,19 @@ def run():
     cgroup0 = net.add_cgroup(name="test_cgroup0",
                             shell=shell,
                             log = log,
-                            controllers={"cpu.max": 0.5, "memory.high": 200000000})
+                            controllers={"cpu.max": 0.5, "memory.high": 200000000},
+                            pid=None)
     cgroup1 = net.add_cgroup(name="test_cgroup1",
                             shell=shell,
                             log = log,
                             controllers={"cpu.max": 0.2, "memory.high": 100000000})
 
     cgroup0 = dummynet.CGroup.build_cgroup(cgroup0, force=True)
-    # cgroup1.make_cgroup()
-    # cgroup0.add_pid(os.getpid())
+
+    cgroup1.delete_cgroup(force=True)
+    cgroup1.make_cgroup()
+    cgroup1.input_validation()
+    cgroup1.set_limit(cgroup1.controllers)
     
     try:
 
@@ -67,8 +71,8 @@ def run():
         proc1 = demo1.run_async(cmd="ping -c 10 10.0.0.1")
         
         # # Add the processes to the cgroup.
-        # test_cgroup0.add_to_cgroup(pid=proc0.pid)
-        # test_cgroup1.add_to_cgroup(pid=proc1.pid)
+        cgroup0.add_pid(pid=proc0.pid)
+        cgroup1.add_pid(pid=proc1.pid)
 
         # Print output as we go (optional)
         def _proc0_stdout(data):

@@ -1,11 +1,11 @@
 import os
 import dummynet
-import logging
 
 
 class CGroup:
     """
     A class for manipulating cgroups.
+
     :param name: The name of the cgroup.
     :param shell: The shell object used for executing shell commands.
     :param log: The log object used for logging messages.
@@ -33,13 +33,14 @@ class CGroup:
                  default_path: str = "/sys/fs/cgroup",
                  controllers: dict = {"cpu.max": None,
                                       "memory.high": None},
-                 pid=None) -> None:
+                 pid=[]) -> None:
         
         self.name = name
         self.shell = shell
         self.log = log
         self.controllers = controllers
         self.pid = pid
+        self.pid_list = []
         self.default_path = default_path
         self.cgroup_pth = os.path.join(self.default_path, self.name)
 
@@ -47,14 +48,15 @@ class CGroup:
     def build_cgroup(cgroup, force=False):
         """
         Build cgroup by calling the following methods:
-        - delete_cgroup
-        - make_cgroup
-        - input_validation
-        - add_cgroup_controller
-        - set_limit
-        - add_pid (if specified).
+
+        * delete_cgroup
+        * make_cgroup
+        * input_validation
+        * set_limit and _add_cgroup_controller
+        * add_pid (if specified).
+
+        :return: A CGroup built object.
         """
-        print(f"{cgroup.controllers=}")
         cgroup.delete_cgroup(force)
         cgroup.make_cgroup(force)
         cgroup.input_validation()
@@ -67,6 +69,7 @@ class CGroup:
     def delete_cgroup(self, force=False):
         """
         Delete the specified cgroup.
+
         :param force: If True, force delete the cgroup. Defaults to False.
         """
         if not force and os.path.exists(self.cgroup_pth):
@@ -78,16 +81,17 @@ class CGroup:
             if "No such file or directory" in e.info.stderr:
                 self.log.info(f"Cgroup {self.name} does not exist. Skipping deletion.\n")
             if "Device or resource busy" in e.info.stderr:
-                self.log.info(f"Cgroup {self.name} failed to delete. Stop running processes before deletion.\n")
+                raise Exception(f"Cgroup {self.name} failed to delete. Stop running processes before deletion.\n")
         else:
             self.log.info(f"Cgroup {self.name} deleted.\n")
 
     def make_cgroup(self, force=False):
         """
         Create a cgroup with the specified name.
+
         :param force: If True, force overwrite the existing cgroup. Defaults to False.
         """
-        if os.path.exists(self.cgroup_pth):
+        if not force and os.path.exists(self.cgroup_pth):
             raise Exception(f"Cgroup {self.name} already exists.\nHint: Use force=True to overwrite the cgroup.")
         else:
             self.shell.run(cmd=f"mkdir {self.cgroup_pth}")
@@ -105,8 +109,10 @@ class CGroup:
     def _add_cgroup_controller(self, controller):
         """
         Add a cgroup controller to the cgroup.
+
         Available controllers:
         (cpuset, cpu, io, memory, hugetlb, pids, rdma, misc)
+
         :param controller: The controller to add.
         """
         
@@ -118,10 +124,13 @@ class CGroup:
     def set_limit(self, controller_dict: dict):
         """
         Set the usage limit for a specific controller in the cgroup.
+
         :param controller_dict: Dictionary of controllers as keys and limits as values.
+
         Available controllers to limit:
-        - cpu (percentage) -> (0, 1]
-        - memory (bytes) -> (0, max]
+
+        * cpu (percentage) -> (0, 1]
+        * memory (bytes) -> (0, max].
         """
         # Filter out Nones
         controller_dict = {key: value for key, value in controller_dict.items() if value is not None}
@@ -139,29 +148,33 @@ class CGroup:
     def add_pid(self, pid):
         """
         Add a Process to the specified cgroup.
+
         :param pid: The process ID.
         """
         if isinstance(pid, int):
             pid = [pid]
-        
         # Check if pid exists
-        try:
-            for p in pid:
+        for p in pid:
+            try:
                 os.kill(p, 0)
-        except OSError:
-            assert False, f"Process {p} is not running."
-        else:
-            self.pid = pid
-            for p in pid:
+            except OSError:
+                assert False, f"Process {p} is not running."
+            else:
+                if p not in self.pid_list:
+                    self.pid_list.append(p)
                 self.shell.run(cmd=f"echo {p} > {self.cgroup_pth}/cgroup.procs")
 
     def hard_clean(self):
         """
         Cleanup the cgroup by removing the pid from cgroup.procs and deleting the cgroup.
         """
-        if self.pid:
-            for p in self.pid: 
-                self.shell.run(cmd=f"echo {p} > {self.default_path}/cgroup.procs")
+        if self.pid_list:
+            with open(f"{self.cgroup_pth}/cgroup.procs", "r") as f:
+                active_pids = f.readlines()
+                active_pids = [int(p.strip("\\n")) for p in active_pids] 
+            for p in self.pid_list:
+                if p in active_pids:
+                    self.shell.run(cmd=f"echo {p} > {self.default_path}/cgroup.procs")
             self.shell.run(cmd=f"echo 1 > {self.cgroup_pth}/cgroup.kill")
         self.delete_cgroup(force=True)
         self.log.info(f"Cleanup complete for cgroup {self.name}.")

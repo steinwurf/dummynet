@@ -5,7 +5,7 @@ every change, see the Git log.
 
 Latest
 ------
-* Minor: Added class ``CgroupsManager`` to add support for managing cgroups and limiting resources used by dummynet.
+* Minor: Added class ``CGroup`` to add support for managing cgroups and limiting resources used by dummynet.
 
 2.5.0
 -----

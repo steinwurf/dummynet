@@ -1,7 +1,7 @@
 .. _dummynetprocess:
 
 ``dummynet.Process``
---------------------------
+--------------------
 
 .. autoclass:: dummynet.Process
     :members:

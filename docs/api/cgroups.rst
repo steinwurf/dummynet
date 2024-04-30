@@ -1,8 +1,8 @@
 .. _dummynetcgroups:
 
-``dummynet.CgroupManager``
----------------------------
+``dummynet.CGroup``
+-------------------
 
-.. autoclass:: dummynet.CgroupManager
+.. autoclass:: dummynet.CGroup
     :members:
     :special-members: __init__
