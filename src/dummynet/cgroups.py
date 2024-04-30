@@ -5,27 +5,16 @@ import logging
 
 class CGroup:
     """
-    A class for managing cgroups.
-
-    Args:
-        name (str): The name of the cgroup.
-        shell: The shell object used for executing shell commands.
-        log: The log object used for logging messages.
-        default_path (str, optional): The default path for cgroups. Defaults to "/sys/fs/cgroup".
-        controllers (dict, optional): The cgroup controllers to add. Can be a string or a list of strings. Defaults to ["cpu"].
-        pid (int, optional): The process ID to add to the cgroup. Defaults to None.
-
-    Methods:
-        input_validation(): Validate the input arguments.
-        build_cgroup(): Plug-and-play cgroup generator.
-        make_cgroup(): Create a cgroup with the specified name.
-        delete_cgroup(): Delete the specified cgroup.
-        add_cgroup_controller(): Add a cgroup controller to the cgroup.
-        add_to_cgroup(pid): Add a process to the specified cgroup.
-        set_limit(): Set the CPU usage limit for a specific process in the cgroup.
+    A class for manipulating cgroups.
+    :param name: The name of the cgroup.
+    :param shell: The shell object used for executing shell commands.
+    :param log: The log object used for logging messages.
+    :param default_path: The default path for cgroups. Defaults to "/sys/fs/cgroup".
+    :param controllers: Dictionary of controllers as keys and limits as values. Defaults to {"cpu.max": None, "memory.high": None}.
+    :param pid: The process ID to add to the cgroup. Defaults to None.
 
     Example:
-        >>> test_cgroup = dummynet.CgroupManager(
+        >>> test_cgroup = dummynet.CGroup(
         name="test_cgroup",
         shell=shell,
         log=log,
@@ -33,12 +22,12 @@ class CGroup:
         controllers={"cpu.max": 0.5, "memory.high": 200000000},
         pid=os.getpid(),
         )
-        >>> test_cgroup_build.build_cgroup()
-        >>> test_cgroup_build.cleanup()
-
+        >>> test_cgroup = dummynet.CGroup.build_cgroup(test_cgroup, force=True)
+        >>> test_cgroup.hard_clean()
     """
 
-    def __init__(self, name: str,
+    def __init__(self,
+                 name: str,
                  shell,
                  log,
                  default_path: str = "/sys/fs/cgroup",
@@ -53,8 +42,9 @@ class CGroup:
         self.pid = pid
         self.default_path = default_path
         self.cgroup_pth = os.path.join(self.default_path, self.name)
-    
-    def build_cgroup(self):
+
+    @staticmethod    
+    def build_cgroup(cgroup, force=False):
         """
         Build cgroup by calling the following methods:
         - delete_cgroup
@@ -62,26 +52,26 @@ class CGroup:
         - input_validation
         - add_cgroup_controller
         - set_limit
-        - add_to_cgroup.
-
-        Returns:
-            None
+        - add_pid (if specified).
         """
-        self.delete_cgroup()
-        self.make_cgroup()
-        self.input_validation()
-        self.add_cgroup_controller()
-        self.set_limit()
-        if self.pid:
-            self.add_to_cgroup(self.pid)
+        print(f"{cgroup.controllers=}")
+        cgroup.delete_cgroup(force)
+        cgroup.make_cgroup(force)
+        cgroup.input_validation()
+        cgroup.set_limit(controller_dict = cgroup.controllers)
+        if cgroup.pid:
+            cgroup.add_pid(cgroup.pid)
+    
+        return cgroup
 
-    def delete_cgroup(self):
+    def delete_cgroup(self, force=False):
         """
         Delete the specified cgroup.
-
-        Returns:
-            None
+        :param force: If True, force delete the cgroup. Defaults to False.
         """
+        if not force and os.path.exists(self.cgroup_pth):
+            raise Exception(f"Cgroup {self.name} already exists.\nHint: Use force=True to force delete the cgroup.")
+
         try:
             self.shell.run(cmd=f"rmdir {self.cgroup_pth}")
         except dummynet.errors.RunInfoError as e:
@@ -92,15 +82,13 @@ class CGroup:
         else:
             self.log.info(f"Cgroup {self.name} deleted.\n")
 
-    def make_cgroup(self):
+    def make_cgroup(self, force=False):
         """
         Create a cgroup with the specified name.
-
-        Returns:
-            None
+        :param force: If True, force overwrite the existing cgroup. Defaults to False.
         """
         if os.path.exists(self.cgroup_pth):
-            self.log.info(f"Cgroup {self.name} already exists. Skipping creation.")        
+            raise Exception(f"Cgroup {self.name} already exists.\nHint: Use force=True to overwrite the cgroup.")
         else:
             self.shell.run(cmd=f"mkdir {self.cgroup_pth}")
             self.log.info(f"Cgroup {self.name} created.")
@@ -108,52 +96,39 @@ class CGroup:
     def input_validation(self):
         """
         Validate the input arguments.
-
-        Returns:
-            None
         """
         assert isinstance(self.name, str), "Name must be a string."
-        assert isinstance(self.shell, dummynet.HostShell), "Shell must be a dummynet.HostShell object."
-        assert isinstance(self.log, logging.Logger), "Log must be a logging.Logger object."
         assert isinstance(self.default_path, str), "Default path must be a string."
         assert isinstance(self.controllers, dict), "Controllers must be a dictionary."
         assert isinstance(self.pid, (int, list, type(None))), "PID must be an integer, list or None."
 
-    def add_cgroup_controller(self):
+    def _add_cgroup_controller(self, controller):
         """
         Add a cgroup controller to the cgroup.
-
         Available controllers:
-
         (cpuset, cpu, io, memory, hugetlb, pids, rdma, misc)
-
-        Returns:
-            None
+        :param controller: The controller to add.
         """
-        for controller in self.controllers.keys():
-            self.shell.run(cmd=f"echo '+{controller.split('.')[0]}' > {self.default_path}/cgroup.subtree_control")
+        
+        self.shell.run(cmd=f"echo '+{controller.split('.')[0]}' > {self.default_path}/cgroup.subtree_control")
         
         controller_list = os.listdir(self.cgroup_pth)
-        for key in self.controllers.keys():
-            assert key in controller_list, f"Controller {key} not found in cgroup directory."
+        assert controller in controller_list, f"Controller {controller} not found in cgroup directory."
 
-    def set_limit(self):
+    def set_limit(self, controller_dict: dict):
         """
         Set the usage limit for a specific controller in the cgroup.
-
+        :param controller_dict: Dictionary of controllers as keys and limits as values.
         Available controllers to limit:
-
         - cpu (percentage) -> (0, 1]
         - memory (bytes) -> (0, max]
-
-        Returns:
-            None
         """
         # Filter out Nones
-        self.controllers = {key: value for key, value in self.controllers.items() if value is not None}
+        controller_dict = {key: value for key, value in controller_dict.items() if value is not None}
         
         # Set limits for each controller
-        for key, value in self.controllers.items():
+        for key, value in controller_dict.items():
+            self._add_cgroup_controller(key)
             if key.startswith("cpu."):
                 assert 0 < value <= 1, f"{key} must be in range (0, 1]."
                 self.shell.run(cmd=f"echo '{int(value*100000)} 100000' > {self.cgroup_pth}/{key}")
@@ -161,15 +136,10 @@ class CGroup:
                 assert value > 0, f"{key} must be greater than 0."
                 self.shell.run(cmd=f"echo '{value}' > {self.cgroup_pth}/{key}")
 
-    def add_to_cgroup(self, pid):
+    def add_pid(self, pid):
         """
-        Add a Process to the specified cgroup via its PID.
-
-        Args:
-            pid (int): The process ID.
-
-        Returns:
-            None
+        Add a Process to the specified cgroup.
+        :param pid: The process ID.
         """
         if isinstance(pid, int):
             pid = [pid]
@@ -185,16 +155,13 @@ class CGroup:
             for p in pid:
                 self.shell.run(cmd=f"echo {p} > {self.cgroup_pth}/cgroup.procs")
 
-    def cleanup(self):
+    def hard_clean(self):
         """
         Cleanup the cgroup by removing the pid from cgroup.procs and deleting the cgroup.
-
-        Returns:
-            None
         """
         if self.pid:
             for p in self.pid: 
                 self.shell.run(cmd=f"echo {p} > {self.default_path}/cgroup.procs")
             self.shell.run(cmd=f"echo 1 > {self.cgroup_pth}/cgroup.kill")
-        self.delete_cgroup()
-        self.log.info(f"Cleanup complete.")
+        self.delete_cgroup(force=True)
+        self.log.info(f"Cleanup complete for cgroup {self.name}.")

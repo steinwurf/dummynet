@@ -283,35 +283,43 @@ def test_cgroups():
     shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
     net = DummyNet(shell=shell)
 
-    # Sad path
-    test_cgroup = dummynet.CgroupManager(
-        name="test_cgroup",
-        shell=shell,
-        log=log,
-        default_path="/sys/fs/cgroup",
-        controllers={"cpu.wrongname": 0.5, "memory.high": -200000000},
-        pid=12345,
-    )
+    @pytest.fixture
+    def sad_path():
+        sad_cgroup = net.add_cgroup(
+            name="test_cgroup_sad",
+            shell=shell,
+            log=log,
+            default_path="/sys/fs/cgroup",
+            controllers={"cpu.wrongname": 0, "memory.high": -200000000},
+            pid=12345,
+        )
+        return sad_cgroup
+    
+    @pytest.fixture
+    def happy_path():
+        happy_cgroup = net.add_cgroup(
+            name="test_cgroup_happy",
+            shell=shell,
+            log=log,
+            default_path="/sys/fs/cgroup",
+            controllers={"cpu.max": 0.5, "memory.high": 200000000},
+            pid=os.getpid(),
+        )
+        return happy_cgroup
 
-    # Happy path
-    test_cgroup_build = dummynet.CgroupManager(
-        name="test_cgroup_build",
-        shell=shell,
-        log=log,
-        default_path="/sys/fs/cgroup",
-        controllers={"cpu.max": 0.5, "memory.high": 200000000},
-        pid=os.getpid(),  # pid to be controled by the cgroup
-    )
+    def test_cgroup_build(happy_path):
+        cgroup_build = happy_path
+        try:
+            log.debug(f"Testing cgroup: {cgroup_build.name} --> Happy path.\n" + "="*70 + "\n")
+            cgroup_build = dummynet.CGroup.build_cgroup(cgroup_build)
+            cgroup_build.hard_clean()
+        except dummynet.errors.RunInfoError as e:
+            raise Exception(f"Error during building cgroup: {e}")
+        else:
+            log.debug(f"Cgroup built: {cgroup_build.name} --> test successful.\n" + "="*70 + "\n")
 
-    try:
-        log.debug(f"Testing cgroup: {test_cgroup_build.name} --> Happy path.\n" + "="*70 + "\n")
-        test_cgroup_build.build_cgroup()
-        test_cgroup_build.cleanup()
-    except dummynet.errors.RunInfoError as e:
-        raise Exception(f"Error building cgroup: {e}")
-    else:
-        log.debug(f"Cgroup built: {test_cgroup_build.name} --> test successful.\n" + "="*70 + "\n")
-
+    def test_cgroup_delete(sad_path):
+        pass
     try:
         log.debug(f"Testing cgroup: {test_cgroup.name} --> Sad path.\n" + "="*70 + "\n")
         test_cgroup.delete_cgroup()

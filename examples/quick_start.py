@@ -23,8 +23,18 @@ def run():
     shell = dummynet.HostShell(log=log, sudo=True, process_monitor=process_monitor)
     net = dummynet.DummyNet(shell=shell)
 
-    cgroup = net.add_cgroup(name="test_cgroup", controllers={"cpu.max": 0.5, "memory.high": 200000000})
-    cgroup.build_cgroup()
+    cgroup0 = net.add_cgroup(name="test_cgroup0",
+                            shell=shell,
+                            log = log,
+                            controllers={"cpu.max": 0.5, "memory.high": 200000000})
+    cgroup1 = net.add_cgroup(name="test_cgroup1",
+                            shell=shell,
+                            log = log,
+                            controllers={"cpu.max": 0.2, "memory.high": 100000000})
+
+    cgroup0 = dummynet.CGroup.build_cgroup(cgroup0, force=True)
+    # cgroup1.make_cgroup()
+    # cgroup0.add_pid(os.getpid())
     
     try:
 
@@ -85,7 +95,7 @@ def run():
 
         # Clean up.
         net.cleanup()
-        test_cgroup.cleanup()
+        net.cgroup_cleanup()
 
 
 if __name__ == "__main__":
