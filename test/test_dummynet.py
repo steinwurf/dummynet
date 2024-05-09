@@ -363,20 +363,20 @@ def test_cgroup_set_limit(sad_path):
     try:
         cgroup_set_limit.set_limit(cgroup_set_limit.controllers)
     except AssertionError as e:
-        assert "must be" in str(e) or "Controller " in str(e)
+        assert "must be in range" in str(e) or "Controller not found in cgroup directory" in str(e)
 
 def test_cgroup_add_pid(sad_path):
     cgroup_add_pid = sad_path
 
     try:
-        cgroup_add_pid.add_pid(pid=cgroup_add_pid.pid)
+        cgroup_add_pid.add_pid(cgroup_add_pid.pid)
     except AssertionError as e:
         assert f"Process {cgroup_add_pid.pid} is not running." in str(e)
 
 def test_cgroup_hard_clean(sad_path):
     cgroup_cleanup = sad_path
-    cgroup_cleanup.pid = []
-    cgroup_cleanup.pid.append(os.getpid())
+    cgroup_cleanup.pid = os.getpid()
+    cgroup_cleanup.add_pid(cgroup_cleanup.pid)
     try:
         cgroup_cleanup.hard_clean()
     except dummynet.errors.RunInfoError as e:

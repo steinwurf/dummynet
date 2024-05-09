@@ -33,7 +33,7 @@ class CGroup:
                  default_path: str = "/sys/fs/cgroup",
                  controllers: dict = {"cpu.max": None,
                                       "memory.high": None},
-                 pid=[]) -> None:
+                 pid=None) -> None:
         
         self.name = name
         self.shell = shell
@@ -60,7 +60,7 @@ class CGroup:
         cgroup.delete_cgroup(force)
         cgroup.make_cgroup(force)
         cgroup.input_validation()
-        cgroup.set_limit(controller_dict = cgroup.controllers)
+        cgroup.set_limit(controller_dict=cgroup.controllers)
         if cgroup.pid:
             cgroup.add_pid(cgroup.pid)
     
@@ -92,7 +92,7 @@ class CGroup:
         :param force: If True, force overwrite the existing cgroup. Defaults to False.
         """
         if not force and os.path.exists(self.cgroup_pth):
-            raise Exception(f"Cgroup {self.name} already exists.\nHint: Use force=True to overwrite the cgroup.")
+            raise Exception(f"Cgroup {self.name} already exists.\nHint: Use delete_cgroup(force=True) to delete a cgroup first.")
         else:
             self.shell.run(cmd=f"mkdir {self.cgroup_pth}")
             self.log.info(f"Cgroup {self.name} created.")
@@ -119,7 +119,7 @@ class CGroup:
         self.shell.run(cmd=f"echo '+{controller.split('.')[0]}' > {self.default_path}/cgroup.subtree_control")
         
         controller_list = os.listdir(self.cgroup_pth)
-        assert controller in controller_list, f"Controller {controller} not found in cgroup directory."
+        assert controller in controller_list, f"Controller not found in cgroup directory. Controller: {controller}"
 
     def set_limit(self, controller_dict: dict):
         """
@@ -142,27 +142,25 @@ class CGroup:
                 assert 0 < value <= 1, f"{key} must be in range (0, 1]."
                 self.shell.run(cmd=f"echo '{int(value*100000)} 100000' > {self.cgroup_pth}/{key}")
             elif key.startswith("memory."):
-                assert value > 0, f"{key} must be greater than 0."
+                assert value > 0, f"{key} must be in range [0, max]."
                 self.shell.run(cmd=f"echo '{value}' > {self.cgroup_pth}/{key}")
 
-    def add_pid(self, pid):
+    def add_pid(self, *args):
         """
         Add a Process to the specified cgroup.
 
-        :param pid: The process ID.
+        :param args: The process ID.
         """
-        if isinstance(pid, int):
-            pid = [pid]
         # Check if pid exists
-        for p in pid:
+        for arg in args:
             try:
-                os.kill(p, 0)
+                os.kill(arg, 0)
             except OSError:
-                assert False, f"Process {p} is not running."
+                assert False, f"Process {arg} is not running."
             else:
-                if p not in self.pid_list:
-                    self.pid_list.append(p)
-                self.shell.run(cmd=f"echo {p} > {self.cgroup_pth}/cgroup.procs")
+                if arg not in self.pid_list:
+                    self.pid_list.append(arg)
+                self.shell.run(cmd=f"echo {arg} > {self.cgroup_pth}/cgroup.procs")
 
     def hard_clean(self):
         """
