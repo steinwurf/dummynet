@@ -316,18 +316,17 @@ def happy_path():
 def test_cgroup_build(happy_path):
     cgroup_build = happy_path
 
-
-    cgroup_build = dummynet.CGroup.build_cgroup(cgroup_build)
+    cgroup_build = dummynet.CGroup.build_cgroup(cgroup_build, force=True)
     cgroup_build.hard_clean()
     assert True
 
 
 def test_cgroup_delete(sad_path):
     cgroup_delete = sad_path
-    cgroup_delete.make_cgroup(force=True)
+    cgroup_delete.make_cgroup(exist_ok=True)
 
     try:
-        cgroup_delete.delete_cgroup(force=False)
+        cgroup_delete.delete_cgroup(not_exist_ok=False)
     except Exception as e:
         assert f"exists" in str(e) 
 
@@ -335,8 +334,8 @@ def test_cgroup_make(sad_path):
     cgroup_make = sad_path
 
     try:
-        cgroup_make.make_cgroup(force=True)
-        cgroup_make.make_cgroup(force=False)
+        cgroup_make.make_cgroup(exist_ok=True)
+        cgroup_make.make_cgroup(exist_ok=False)
     except Exception as e:
         assert f"exists" in str(e) 
 

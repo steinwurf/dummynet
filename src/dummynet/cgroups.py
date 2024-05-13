@@ -66,14 +66,14 @@ class CGroup:
     
         return cgroup
 
-    def delete_cgroup(self, force=False):
+    def delete_cgroup(self, not_exist_ok=False):
         """
         Delete the specified cgroup.
 
-        :param force: If True, force delete the cgroup. Defaults to False.
+        :param not_exist_ok: If True, ignore if cgroup does not exist, otherwise raise Exception if does not exist. Defaults to False.
         """
-        if not force and os.path.exists(self.cgroup_pth):
-            raise Exception(f"Cgroup {self.name} already exists.\nHint: Use force=True to force delete the cgroup.")
+        if not not_exist_ok and not os.path.exists(self.cgroup_pth):
+            raise Exception(f"Cgroup {self.name} already exists.\nHint: Use not_exist_ok=True to ignore if file does not exist.")
 
         try:
             self.shell.run(cmd=f"rmdir {self.cgroup_pth}")
@@ -85,17 +85,19 @@ class CGroup:
         else:
             self.log.info(f"Cgroup {self.name} deleted.\n")
 
-    def make_cgroup(self, force=False):
+    def make_cgroup(self, exist_ok=False):
         """
         Create a cgroup with the specified name.
 
-        :param force: If True, force overwrite the existing cgroup. Defaults to False.
+        :param exist_ok: If True, force overwrite the existing cgroup, otherwise raise Exception if it already exists. Defaults to False.
         """
-        if not force and os.path.exists(self.cgroup_pth):
-            raise Exception(f"Cgroup {self.name} already exists.\nHint: Use delete_cgroup(force=True) to delete a cgroup first.")
-        else:
-            self.shell.run(cmd=f"mkdir {self.cgroup_pth}")
-            self.log.info(f"Cgroup {self.name} created.")
+        if os.path.exists(self.cgroup_pth) and exist_ok:
+            self.delete_cgroup()
+        elif not exist_ok and os.path.exists(self.cgroup_pth):
+            raise Exception(f"Cgroup {self.name} already exists and exist_ok=False.")
+        
+        self.shell.run(cmd=f"mkdir {self.cgroup_pth}")
+        self.log.info(f"Cgroup {self.name} created.")
 
     def input_validation(self):
         """
@@ -116,7 +118,7 @@ class CGroup:
         :param controller: The controller to add.
         """
         
-        self.shell.run(cmd=f"echo '+{controller.split('.')[0]}' > {self.default_path}/cgroup.subtree_control")
+        self.shell.run(cmd=f" echo '+{controller.split('.')[0]}' | sudo tee {self.default_path}/cgroup.subtree_control")
         
         controller_list = os.listdir(self.cgroup_pth)
         assert controller in controller_list, f"Controller not found in cgroup directory. Controller: {controller}"
@@ -140,10 +142,10 @@ class CGroup:
             self._add_cgroup_controller(key)
             if key.startswith("cpu."):
                 assert 0 < value <= 1, f"{key} must be in range (0, 1]."
-                self.shell.run(cmd=f"echo '{int(value*100000)} 100000' > {self.cgroup_pth}/{key}")
+                self.shell.run(cmd=f"echo '{int(value*100000)} 100000' | sudo tee {self.cgroup_pth}/{key}")
             elif key.startswith("memory."):
                 assert value > 0, f"{key} must be in range [0, max]."
-                self.shell.run(cmd=f"echo '{value}' > {self.cgroup_pth}/{key}")
+                self.shell.run(cmd=f"echo '{value}' | sudo tee {self.cgroup_pth}/{key}")
 
     def add_pid(self, *args):
         """
@@ -160,7 +162,7 @@ class CGroup:
             else:
                 if arg not in self.pid_list:
                     self.pid_list.append(arg)
-                self.shell.run(cmd=f"echo {arg} > {self.cgroup_pth}/cgroup.procs")
+                self.shell.run(cmd=f"echo {arg} | sudo tee {self.cgroup_pth}/cgroup.procs")
 
     def hard_clean(self):
         """
@@ -172,7 +174,7 @@ class CGroup:
                 active_pids = [int(p.strip("\\n")) for p in active_pids] 
             for p in self.pid_list:
                 if p in active_pids:
-                    self.shell.run(cmd=f"echo {p} > {self.default_path}/cgroup.procs")
-            self.shell.run(cmd=f"echo 1 > {self.cgroup_pth}/cgroup.kill")
-        self.delete_cgroup(force=True)
+                    self.shell.run(cmd=f"echo {p} | sudo tee {self.default_path}/cgroup.procs")
+            self.shell.run(cmd=f"echo 1 | sudo tee {self.cgroup_pth}/cgroup.kill")
+        self.delete_cgroup(not_exist_ok=True)
         self.log.info(f"Cleanup complete for cgroup {self.name}.")

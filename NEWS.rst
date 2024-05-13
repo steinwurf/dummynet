@@ -5,7 +5,12 @@ every change, see the Git log.
 
 Latest
 ------
+* tbd
+
+2.6.0
+-----
 * Minor: Added class ``CGroup`` to add support for managing cgroups and limiting resources used by dummynet.
+* Patch: Fixed issue with file-handling commands in cgroups.
 
 2.5.0
 -----
