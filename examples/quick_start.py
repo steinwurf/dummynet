@@ -1,17 +1,43 @@
 import dummynet
 import logging
+import sys
+import argparse
 
 
 def run():
+
+    parser = argparse.ArgumentParser(description="Program with debugger option")
+    parser.add_argument("--debug", action="store_true", help="Enable log debugger")
+    args = parser.parse_args()
+
     log = logging.getLogger("dummynet")
     log.setLevel(logging.DEBUG)
+    
+    if args.debug:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.DEBUG)
+        log.addHandler(console_handler)
 
     process_monitor = dummynet.ProcessMonitor(log=log)
-
     shell = dummynet.HostShell(log=log, sudo=True, process_monitor=process_monitor)
-
     net = dummynet.DummyNet(shell=shell)
 
+    cgroup0 = net.add_cgroup(name="test_cgroup0",
+                            shell=shell,
+                            log = log,
+                            controllers={"cpu.max": 0.5, "memory.high": 200000000},
+                            pid=None)
+    cgroup0 = dummynet.CGroup.build_cgroup(cgroup0, force=True)
+
+    cgroup1 = net.add_cgroup(name="test_cgroup1",
+                            shell=shell,
+                            log = log,
+                            controllers={"cpu.max": 0.2, "memory.high": 100000000})
+    cgroup1.delete_cgroup(force=True)
+    cgroup1.make_cgroup()
+    cgroup1.input_validation()
+    cgroup1.set_limit(cgroup1.controllers)
+    
     try:
 
         # Get a list of the current namespaces
@@ -41,6 +67,10 @@ def run():
         # Test will run until last non-daemon process is done.
         proc0 = demo0.run_async(cmd="ping -c 20 10.0.0.2", daemon=True)
         proc1 = demo1.run_async(cmd="ping -c 10 10.0.0.1")
+        
+        # # Add the processes to the cgroup.
+        cgroup0.add_pid(proc0.pid)
+        cgroup1.add_pid(proc1.pid)
 
         # Print output as we go (optional)
         def _proc0_stdout(data):
@@ -67,6 +97,7 @@ def run():
 
         # Clean up.
         net.cleanup()
+        net.cgroup_cleanup()
 
 
 if __name__ == "__main__":

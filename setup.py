@@ -33,7 +33,7 @@ setup(
         "Topic :: Software Development",
         "Topic :: Software Development :: Testing",
     ],
-    keywords=("dummynet", "network", "namespace"),
+    keywords=["dummynet", "network", "namespace"],
     packages=find_packages(where="src", exclude=["test"]),
     package_dir={"": "src"},
     install_requires=[],
