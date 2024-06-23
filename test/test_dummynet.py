@@ -15,8 +15,11 @@ def test_run():
 
     sudo = os.getuid() != 0
 
+    # Create a process monitor
+    process_monitor = ProcessMonitor(log=log)
+
     # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=sudo, process_monitor=None)
+    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
 
     # Create a mock shell which will receive the calls performed by the DummyNet
     # shell = mockshell.MockShell()
@@ -133,7 +136,7 @@ def test_run_async():
         proc0.stdout_callback = _proc0_stdout
         proc1.stdout_callback = _proc1_stdout
 
-        while process_monitor.run():
+        while process_monitor.keep_running():
             pass
 
         proc0.match(stdout="10 packets transmitted*", stderr=None)
@@ -170,7 +173,7 @@ def test_with_timeout():
 
         end_time = time.time() + 2
 
-        while process_monitor.run(timeout=500):
+        while process_monitor.keep_running(timeout=0.5):
             if time.time() >= end_time:
                 log.debug("Test timeout")
                 process_monitor.stop()
@@ -198,9 +201,11 @@ def test_daemon_exit():
     shell.run_async(cmd="ping -c 5 8.8.8.8", daemon=True)
     shell.run_async(cmd="ping -c 50 8.8.8.8")
 
-    with pytest.raises(dummynet.DaemonExitError):
-        while process_monitor.run():
+    with pytest.raises(ExceptionGroup) as e:
+        while process_monitor.keep_running():
             pass
+
+    assert e.group_contains(dummynet.DaemonExitError)
 
 
 def test_all_daemons():
@@ -216,13 +221,12 @@ def test_all_daemons():
     # The host shell used if we don't have a recording
     shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
 
-    # Run two commands on the host where the daemon will exit
-    # before the non-daemon command
+    # Run two commands where both are daemons
     shell.run_async(cmd="ping -c 5 8.8.8.8", daemon=True)
     shell.run_async(cmd="ping -c 50 8.8.8.8", daemon=True)
 
-    with pytest.raises(dummynet.AllDaemonsError):
-        while process_monitor.run():
+    with pytest.raises(dummynet.NoProcessesError):
+        while process_monitor.keep_running():
             pass
 
 
@@ -235,7 +239,7 @@ def test_no_processes():
     process_monitor = ProcessMonitor(log=log)
 
     # Nothing to do
-    while process_monitor.run():
+    while process_monitor.keep_running():
         pass
 
 
@@ -254,22 +258,20 @@ def test_hostshell_timeout():
     # Check that we get a timeout if we run a command that takes too long
     with pytest.raises(dummynet.TimeoutError):
         # Run a command on the host
-        shell.run(cmd="sleep 10", timeout=1100)
+        shell.run(cmd="sleep 10", timeout=1.5)
 
     difference = time.time() - start
 
-    # Check that the timeout was more than 1 second
-    assert difference > 1
-
-    # Check that the timeout was less than 2 seconds
-    assert difference < 2
+    # Check that the timeout was more than 1 second but less than 2 seconds
+    assert difference > 1 and difference < 2
 
     # Check that we don't get a timeout if we run that runs within the timeout
-    shell.run(cmd="sleep 1", timeout=1200)
+    shell.run(cmd="sleep 1", timeout=1.5)
 
     # Nothing to do
-    while process_monitor.run():
+    while process_monitor.keep_running():
         pass
+
 
 @pytest.fixture
 def sad_path():
@@ -292,6 +294,7 @@ def sad_path():
     )
     return sad_cgroup
 
+
 @pytest.fixture
 def happy_path():
     log = logging.getLogger("dummynet")
@@ -313,6 +316,7 @@ def happy_path():
     )
     return happy_cgroup
 
+
 def test_cgroup_build(happy_path):
     cgroup_build = happy_path
 
@@ -328,7 +332,8 @@ def test_cgroup_delete(sad_path):
     try:
         cgroup_delete.delete_cgroup(not_exist_ok=False)
     except Exception as e:
-        assert f"exists" in str(e) 
+        assert f"exists" in str(e)
+
 
 def test_cgroup_make(sad_path):
     cgroup_make = sad_path
@@ -337,7 +342,8 @@ def test_cgroup_make(sad_path):
         cgroup_make.make_cgroup(exist_ok=True)
         cgroup_make.make_cgroup(exist_ok=False)
     except Exception as e:
-        assert f"exists" in str(e) 
+        assert f"exists" in str(e)
+
 
 def test_cgroup__add_cgroup_controller(sad_path):
     cgroup_add_controller = sad_path
@@ -346,6 +352,7 @@ def test_cgroup__add_cgroup_controller(sad_path):
         cgroup_add_controller._add_cgroup_controller("cpu.wrongname")
     except AssertionError as e:
         assert "Controller " in str(e)
+
 
 def test_cgroup_input_validation(sad_path):
     cgroup_input_validation = sad_path
@@ -356,13 +363,17 @@ def test_cgroup_input_validation(sad_path):
     except AssertionError as e:
         assert "Name must be a string" in str(e)
 
+
 def test_cgroup_set_limit(sad_path):
     cgroup_set_limit = sad_path
 
     try:
         cgroup_set_limit.set_limit(cgroup_set_limit.controllers)
     except AssertionError as e:
-        assert "must be in range" in str(e) or "Controller not found in cgroup directory" in str(e)
+        assert "must be in range" in str(
+            e
+        ) or "Controller not found in cgroup directory" in str(e)
+
 
 def test_cgroup_add_pid(sad_path):
     cgroup_add_pid = sad_path
@@ -372,6 +383,7 @@ def test_cgroup_add_pid(sad_path):
     except AssertionError as e:
         assert f"Process {cgroup_add_pid.pid} is not running." in str(e)
 
+
 def test_cgroup_hard_clean(sad_path):
     cgroup_cleanup = sad_path
     cgroup_cleanup.pid = os.getpid()
@@ -380,3 +392,40 @@ def test_cgroup_hard_clean(sad_path):
         cgroup_cleanup.hard_clean()
     except dummynet.errors.RunInfoError as e:
         assert "No such file or directory" in str(e)
+
+
+def run_hostshell_timeout_daemon():
+    # Seperated this in to a function to look like a typical integration
+    # test
+
+    log = logging.getLogger("dummynet")
+    log.setLevel(logging.DEBUG)
+    log.addHandler(logging.StreamHandler())
+
+    # Create a process monitor
+    process_monitor = ProcessMonitor(log=log)
+
+    # The host shell
+    shell = HostShell(log=log, sudo=False, process_monitor=process_monitor)
+
+    # Start a deamon process (those should not exit before the test is over)
+    shell.run_async(cmd="sleep 2", daemon=True)
+
+    # Next we run a blocking command that will timeout
+    # we expect to also be notified that the daemon process exited
+    # prematurely
+    try:
+        shell.run(cmd="sleep 10", timeout=5)
+    except:
+        process_monitor.stop()
+
+    # Nothing to do
+    while process_monitor.keep_running():
+        pass
+
+
+def test_hostshell_timeout_daemon():
+
+    # Check that we get a timeout if we run a command that takes too long
+
+    run_hostshell_timeout_daemon()
