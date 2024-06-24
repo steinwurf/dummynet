@@ -133,6 +133,11 @@ def _pytest_dev(bld):
 
 def _pytest_run(bld):
 
+    is_root = os.getuid() == 0
+
+    if not is_root:
+        bld.fatal("You need to run the tests as root")
+
     venv = bld.create_virtualenv(overwrite=True)
     venv.run("python -m pip install -r test/requirements.txt")
 
@@ -162,15 +167,8 @@ def _pytest_run(bld):
     #
     test_filter = "test"
 
-    sudo = os.getuid() != 0
-
-    if sudo:
-        sudo_cmd = "sudo -E env PATH=$PATH "
-    else:
-        sudo_cmd = ""
-
     # Main test command
-    venv.run(f"{sudo_cmd}python -B -m pytest {test_filter} --basetemp {basetemp}")
+    venv.run(f"python -B -m pytest {test_filter} --basetemp {basetemp}")
 
     # Check the package
     venv.run(f"twine check {wheel}")
