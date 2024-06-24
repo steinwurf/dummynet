@@ -1,37 +1,37 @@
 name: Waf Python Tests
-'on':
+"on":
   workflow_dispatch:
     inputs:
       extra_resolve_options:
         description: Extra Resolve Options
         required: false
   schedule:
-  - cron: 0 1 * * *
+    - cron: 0 1 * * *
   push:
     branches:
-    - master
+      - master
   pull_request:
 jobs:
   waf:
     name: Waf
     runs-on:
-    - self-hosted
-    - builder
-    - docker
+      - self-hosted
+      - builder
+      - docker
     container:
-      image: python:3.9.5
+      image: python:3.11.6
       options: --user 0:0 --privileged
       volumes:
-      - /home/buildbot/.ssh:/root/.ssh
+        - /home/buildbot/.ssh:/root/.ssh
     steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-    - name: Configure
-      run: python3 waf configure
-    - name: Build
-      run: python3 waf
-    - name: Test
-      run: python3 waf --run_tests
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Configure
+        run: python3 waf configure
+      - name: Build
+        run: python3 waf
+      - name: Test
+        run: python3 waf --run_tests
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
   cancel-in-progress: true
