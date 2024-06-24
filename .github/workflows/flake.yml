@@ -6,6 +6,10 @@ on:
         description: "Excluded Errors"
         type: string
         required: false
+    push:
+    branches:
+      - master
+  pull_request:
 jobs:
   Flake8:
     strategy:
@@ -26,7 +30,7 @@ jobs:
         uses: actions/checkout@v3
       - name: Check Python syntax
         env:
-          EXCLUDED_ERRORS: ${{ inputs.excluded_errors }}
+          EXCLUDED_ERRORS: F632
         # if: ${{ env.EXCLUDED_ERRORS != '' }}
         # Inspired by https://github.com/cclauss/Find-Python-syntax-errors-action/blob/master/Dockerfile
         run: flake8 . --count --select=E9,F63,F72,F82 --ignore=${{ env.EXCLUDED_ERRORS }} --show-source --statistics
