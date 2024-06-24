@@ -5,16 +5,19 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Major: Remove sudo from HostShell.
+* Major: Rename `ProcessMonitor.run`to `ProcessMonitor.keep_running`.
 
 2.6.0
 -----
-* Minor: Added class ``CGroup`` to add support for managing cgroups and limiting resources used by dummynet.
+* Minor: Added class ``CGroup`` to add support for managing cgroups and limiting
+  resources used by dummynet.
 * Patch: Fixed issue with file-handling commands in cgroups.
 
 2.5.0
 -----
-* Minor: Added support for setting a timeout on `HostShell.run` and `NamespaceShell.run`.
+* Minor: Added support for setting a timeout on `HostShell.run` and
+  `NamespaceShell.run`.
 
 2.4.1
 -----
