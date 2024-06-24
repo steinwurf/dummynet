@@ -19,7 +19,7 @@ jobs:
       - builder
       - docker
     container:
-      image: ubuntu:23.04
+      image: ghcr.io/steinwurf/python-bindings:1.1.0
       options: --user 0:0 --privileged
       volumes:
         - /home/buildbot/.ssh:/root/.ssh
