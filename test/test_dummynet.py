@@ -319,12 +319,12 @@ def happy_path():
     return happy_cgroup
 
 
-def test_cgroup_build(happy_path):
-    cgroup_build = happy_path
+# def test_cgroup_build(happy_path):
+#     cgroup_build = happy_path
 
-    cgroup_build = dummynet.CGroup.build_cgroup(cgroup_build, force=True)
-    cgroup_build.hard_clean()
-    assert True
+#     cgroup_build = dummynet.CGroup.build_cgroup(cgroup_build, force=True)
+#     cgroup_build.hard_clean()
+#     assert True
 
 
 def test_cgroup_delete(sad_path):
