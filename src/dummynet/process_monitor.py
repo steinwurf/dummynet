@@ -228,11 +228,15 @@ class ProcessMonitor:
             )
 
             return process.info
-        except:
+        except Exception as e:
 
             # Before we raise the exception we check if any other
             # errors have occoured
-            self._validate_state()
+
+            try:
+                self._validate_state()
+            except Exception as nested:
+                raise ExceptionGroup("Run failure", [e, nested])
 
             # Re-raise the exception to make sure the caller knows
             raise

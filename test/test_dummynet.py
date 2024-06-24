@@ -21,7 +21,7 @@ def test_run():
     process_monitor = ProcessMonitor(log=log)
 
     # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+    shell = HostShell(log=log, process_monitor=process_monitor)
 
     # Create a mock shell which will receive the calls performed by the DummyNet
     # shell = mockshell.MockShell()
@@ -97,7 +97,7 @@ def test_run_async():
 
     process_monitor = ProcessMonitor(log=log)
 
-    shell = HostShell(log=log, sudo=False, process_monitor=process_monitor)
+    shell = HostShell(log=log, process_monitor=process_monitor)
 
     net = DummyNet(shell=shell)
 
@@ -160,7 +160,7 @@ def test_with_timeout():
     process_monitor = ProcessMonitor(log=log)
 
     # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+    shell = HostShell(log=log, process_monitor=process_monitor)
 
     # DummyNet wrapper that will prevent clean up from happening in playback
     # mode if an exception occurs
@@ -196,7 +196,7 @@ def test_daemon_exit():
     process_monitor = ProcessMonitor(log=log)
 
     # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+    shell = HostShell(log=log, process_monitor=process_monitor)
 
     # Run two commands on the host where the daemon will exit
     # before the non-daemon command
@@ -221,7 +221,7 @@ def test_all_daemons():
     process_monitor = ProcessMonitor(log=log)
 
     # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+    shell = HostShell(log=log, process_monitor=process_monitor)
 
     # Run two commands where both are daemons
     shell.run_async(cmd="ping -c 5 8.8.8.8", daemon=True)
@@ -254,7 +254,7 @@ def test_hostshell_timeout():
     process_monitor = ProcessMonitor(log=log)
 
     # The host shell
-    shell = HostShell(log=log, sudo=False, process_monitor=process_monitor)
+    shell = HostShell(log=log, process_monitor=process_monitor)
 
     start = time.time()
     # Check that we get a timeout if we run a command that takes too long
@@ -283,7 +283,7 @@ def sad_path():
     sudo = os.getuid() != 0
 
     process_monitor = ProcessMonitor(log=log)
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+    shell = HostShell(log=log, process_monitor=process_monitor)
     net = DummyNet(shell=shell)
 
     sad_cgroup = net.add_cgroup(
@@ -305,7 +305,7 @@ def happy_path():
     sudo = os.getuid() != 0
 
     process_monitor = ProcessMonitor(log=log)
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+    shell = HostShell(log=log, process_monitor=process_monitor)
     net = DummyNet(shell=shell)
 
     happy_cgroup = net.add_cgroup(
@@ -408,7 +408,7 @@ def run_hostshell_timeout_daemon():
     process_monitor = ProcessMonitor(log=log)
 
     # The host shell
-    shell = HostShell(log=log, sudo=False, process_monitor=process_monitor)
+    shell = HostShell(log=log, process_monitor=process_monitor)
 
     # Start a deamon process (those should not exit before the test is over)
     shell.run_async(cmd="sleep 2", daemon=True)
@@ -431,5 +431,5 @@ def test_hostshell_timeout_daemon():
     with pytest.raises(ExceptionGroup) as e:
         run_hostshell_timeout_daemon()
 
-    # assert e.group_contains(dummynet.TimeoutError)
+    assert e.group_contains(dummynet.TimeoutError)
     assert e.group_contains(dummynet.DaemonExitError)

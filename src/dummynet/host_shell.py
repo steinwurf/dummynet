@@ -10,7 +10,7 @@ from . import errors
 class HostShell(object):
     """A shell object for running commands"""
 
-    def __init__(self, log, sudo: bool, process_monitor):
+    def __init__(self, log, process_monitor):
         """Create a new HostShell object
 
         :param log: The logger to use
@@ -20,7 +20,6 @@ class HostShell(object):
                                 finished.
         """
         self.log = log
-        self.sudo = sudo
         self.process_monitor = process_monitor
 
     def run(self, cmd: str, cwd=None, env=None, timeout=None):
@@ -31,9 +30,6 @@ class HostShell(object):
         :param env: The environment variables to set
         :param timeout: Maximum time (in milliseconds) to wait for the command to complete
         """
-
-        if self.sudo:
-            cmd = "sudo " + cmd
 
         if env is None:
             env = os.environ.copy()
@@ -51,8 +47,6 @@ class HostShell(object):
         :param cwd: The current working directory i.e. where the command will
                     run
         """
-        if self.sudo:
-            cmd = "sudo " + cmd
 
         if env is None:
             env = os.environ.copy()
