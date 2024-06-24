@@ -9,9 +9,11 @@ import time
 import pytest
 import os
 
+log = logging.getLogger("dummynet")
+log.setLevel(logging.DEBUG)
+
 
 def test_run():
-    log = logging.getLogger("dummynet")
 
     sudo = os.getuid() != 0
 
@@ -90,12 +92,12 @@ def test_run():
 def test_run_async():
     sudo = os.getuid() != 0
 
-    log = logging.getLogger("dummynet")
-    log.setLevel(logging.DEBUG)
+    # log = logging.getLogger("dummynet")
+    # log.setLevel(logging.DEBUG)
 
     process_monitor = ProcessMonitor(log=log)
 
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+    shell = HostShell(log=log, sudo=False, process_monitor=process_monitor)
 
     net = DummyNet(shell=shell)
 
@@ -150,9 +152,9 @@ def test_run_async():
 def test_with_timeout():
     sudo = os.getuid() != 0
 
-    log = logging.getLogger("dummynet")
-    log.setLevel(logging.DEBUG)
-    log.addHandler(logging.StreamHandler())
+    # log = logging.getLogger("dummynet")
+    # log.setLevel(logging.DEBUG)
+    # log.addHandler(logging.StreamHandler())
 
     # Create a process monitor
     process_monitor = ProcessMonitor(log=log)
@@ -186,9 +188,9 @@ def test_with_timeout():
 def test_daemon_exit():
     sudo = os.getuid() != 0
 
-    log = logging.getLogger("dummynet")
-    log.setLevel(logging.DEBUG)
-    log.addHandler(logging.StreamHandler())
+    # log = logging.getLogger("dummynet")
+    # log.setLevel(logging.DEBUG)
+    # log.addHandler(logging.StreamHandler())
 
     # Create a process monitor
     process_monitor = ProcessMonitor(log=log)
@@ -211,9 +213,9 @@ def test_daemon_exit():
 def test_all_daemons():
     sudo = os.getuid() != 0
 
-    log = logging.getLogger("dummynet")
-    log.setLevel(logging.DEBUG)
-    log.addHandler(logging.StreamHandler())
+    # log = logging.getLogger("dummynet")
+    # log.setLevel(logging.DEBUG)
+    # log.addHandler(logging.StreamHandler())
 
     # Create a process monitor
     process_monitor = ProcessMonitor(log=log)
@@ -231,9 +233,9 @@ def test_all_daemons():
 
 
 def test_no_processes():
-    log = logging.getLogger("dummynet")
-    log.setLevel(logging.DEBUG)
-    log.addHandler(logging.StreamHandler())
+    # log = logging.getLogger("dummynet")
+    # log.setLevel(logging.DEBUG)
+    # log.addHandler(logging.StreamHandler())
 
     # Create a process monitor
     process_monitor = ProcessMonitor(log=log)
@@ -244,9 +246,9 @@ def test_no_processes():
 
 
 def test_hostshell_timeout():
-    log = logging.getLogger("dummynet")
-    log.setLevel(logging.DEBUG)
-    log.addHandler(logging.StreamHandler())
+    # log = logging.getLogger("dummynet")
+    # log.setLevel(logging.DEBUG)
+    # log.addHandler(logging.StreamHandler())
 
     # Create a process monitor
     process_monitor = ProcessMonitor(log=log)
@@ -275,9 +277,9 @@ def test_hostshell_timeout():
 
 @pytest.fixture
 def sad_path():
-    log = logging.getLogger("dummynet")
-    log.setLevel(logging.DEBUG)
-    log.addHandler(logging.StreamHandler())
+    # log = logging.getLogger("dummynet")
+    # log.setLevel(logging.DEBUG)
+    # log.addHandler(logging.StreamHandler())
     sudo = os.getuid() != 0
 
     process_monitor = ProcessMonitor(log=log)
@@ -297,9 +299,9 @@ def sad_path():
 
 @pytest.fixture
 def happy_path():
-    log = logging.getLogger("dummynet")
-    log.setLevel(logging.DEBUG)
-    log.addHandler(logging.StreamHandler())
+    # log = logging.getLogger("dummynet")
+    # log.setLevel(logging.DEBUG)
+    # log.addHandler(logging.StreamHandler())
     sudo = os.getuid() != 0
 
     process_monitor = ProcessMonitor(log=log)
@@ -398,9 +400,9 @@ def run_hostshell_timeout_daemon():
     # Seperated this in to a function to look like a typical integration
     # test
 
-    log = logging.getLogger("dummynet")
-    log.setLevel(logging.DEBUG)
-    log.addHandler(logging.StreamHandler())
+    # log = logging.getLogger("dummynet")
+    # log.setLevel(logging.DEBUG)
+    # log.addHandler(logging.StreamHandler())
 
     # Create a process monitor
     process_monitor = ProcessMonitor(log=log)
@@ -414,10 +416,8 @@ def run_hostshell_timeout_daemon():
     # Next we run a blocking command that will timeout
     # we expect to also be notified that the daemon process exited
     # prematurely
-    try:
-        shell.run(cmd="sleep 10", timeout=5)
-    except:
-        process_monitor.stop()
+
+    shell.run(cmd="sleep 10", timeout=5)
 
     # Nothing to do
     while process_monitor.keep_running():
@@ -428,4 +428,8 @@ def test_hostshell_timeout_daemon():
 
     # Check that we get a timeout if we run a command that takes too long
 
-    run_hostshell_timeout_daemon()
+    with pytest.raises(ExceptionGroup) as e:
+        run_hostshell_timeout_daemon()
+
+    # assert e.group_contains(dummynet.TimeoutError)
+    assert e.group_contains(dummynet.DaemonExitError)

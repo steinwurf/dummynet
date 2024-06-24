@@ -154,6 +154,9 @@ class ProcessMonitor:
                     poller.wait_fd(self.popen.stdout.fileno())
                     poller.wait_fd(self.popen.stderr.fileno())
 
+                    if self.info.returncode != 0:
+                        raise errors.RunInfoError(info=self.info)
+
                 except subprocess.TimeoutExpired:
 
                     # The process did not exit
