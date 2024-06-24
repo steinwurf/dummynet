@@ -19,7 +19,7 @@ jobs:
       - builder
       - docker
     container:
-      image: python:3.11.6
+      image: ubuntu:23.04
       options: --user 0:0 --privileged
       volumes:
         - /home/buildbot/.ssh:/root/.ssh
