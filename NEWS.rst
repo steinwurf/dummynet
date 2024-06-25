@@ -5,7 +5,7 @@ every change, see the Git log.
 
 Latest
 ------
-* Major: Remove sudo from HostShell.
+* Major: Requires Python 3.11 or later (due to use of ExceptionGroup).
 * Major: Rename `ProcessMonitor.run`to `ProcessMonitor.keep_running`.
 
 2.6.0
