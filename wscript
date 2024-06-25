@@ -133,11 +133,6 @@ def _pytest_dev(bld):
 
 def _pytest_run(bld):
 
-    is_root = os.getuid() == 0
-
-    if not is_root:
-        bld.fatal("You need to run the tests as root")
-
     venv = bld.create_virtualenv(overwrite=True)
     venv.run("python -m pip install -r test/requirements.txt")
 

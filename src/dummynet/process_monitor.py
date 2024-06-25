@@ -3,10 +3,29 @@ import textwrap
 import os
 import subprocess
 import signal
+import getpass
 
 from . import errors
 from . import process
 from . import run_info
+
+# The cached sudo password
+cached_sudo_password = None
+
+
+def get_sudo_password():
+    """Get the sudo password from the user"""
+
+    global cached_sudo_password
+
+    if cached_sudo_password:
+        return cached_sudo_password
+
+    prompt = f"\n[sudo] password for {getpass.getuser()}: "
+
+    cached_sudo_password = getpass.getpass(prompt=prompt) + "\n"
+
+    return cached_sudo_password
 
 
 class ProcessMonitor:
@@ -84,7 +103,9 @@ class ProcessMonitor:
     class Process:
         """A process object to track the state of a process"""
 
-        def __init__(self, cmd: str, cwd, env, is_async, is_daemon, timeout, poller):
+        def __init__(
+            self, cmd: str, cwd, env, sudo, is_async, is_daemon, timeout, poller
+        ):
             """Construct a new process object."""
 
             self.popen = subprocess.Popen(
@@ -145,6 +166,11 @@ class ProcessMonitor:
                 self.popen.stderr.fileno(),
                 stderr_callback,
             )
+
+            # Pipe the sudo password to the process
+            if sudo:
+                self.popen.stdin.write(get_sudo_password())
+                self.popen.stdin.flush()
 
             if not is_async:
 
@@ -214,13 +240,14 @@ class ProcessMonitor:
         # The poller is used to wait for processes to terminate
         self.poller = ProcessMonitor.Poller(log=log)
 
-    def run_process(self, cmd: str, cwd=None, env=None, timeout=None):
+    def run_process(self, cmd: str, sudo, cwd=None, env=None, timeout=None):
 
         try:
             process = ProcessMonitor.Process(
                 cmd=cmd,
                 cwd=cwd,
                 env=env,
+                sudo=sudo,
                 is_async=False,
                 is_daemon=False,
                 timeout=timeout,
@@ -241,12 +268,13 @@ class ProcessMonitor:
             # Re-raise the exception to make sure the caller knows
             raise
 
-    def run_process_async(self, cmd: str, daemon=False, cwd=None, env=None):
+    def run_process_async(self, cmd: str, sudo, daemon=False, cwd=None, env=None):
         try:
             process = ProcessMonitor.Process(
                 cmd=cmd,
                 cwd=cwd,
                 env=env,
+                sudo=sudo,
                 is_async=True,
                 is_daemon=daemon,
                 timeout=None,

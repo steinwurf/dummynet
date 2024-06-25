@@ -10,7 +10,7 @@ from . import errors
 class HostShell(object):
     """A shell object for running commands"""
 
-    def __init__(self, log, process_monitor):
+    def __init__(self, log, sudo, process_monitor):
         """Create a new HostShell object
 
         :param log: The logger to use
@@ -20,6 +20,7 @@ class HostShell(object):
                                 finished.
         """
         self.log = log
+        self.sudo = sudo
         self.process_monitor = process_monitor
 
     def run(self, cmd: str, cwd=None, env=None, timeout=None):
@@ -28,8 +29,11 @@ class HostShell(object):
         :param cmd: The command to run
         :param cwd: The current working directory i.e. where the command will run
         :param env: The environment variables to set
-        :param timeout: Maximum time (in milliseconds) to wait for the command to complete
+        :param timeout: Maximum time (in seconds) to wait for the command to complete
         """
+
+        if self.sudo:
+            cmd = "sudo -S -- " + cmd
 
         if env is None:
             env = os.environ.copy()
@@ -37,7 +41,7 @@ class HostShell(object):
         self.log.debug(cmd)
 
         return self.process_monitor.run_process(
-            cmd=cmd, cwd=cwd, env=env, timeout=timeout
+            cmd=cmd, sudo=self.sudo, cwd=cwd, env=env, timeout=timeout
         )
 
     def run_async(self, cmd: str, daemon=False, cwd=None, env=None):
@@ -48,11 +52,14 @@ class HostShell(object):
                     run
         """
 
+        if self.sudo:
+            cmd = "sudo -S -- " + cmd
+
         if env is None:
             env = os.environ.copy()
 
         self.log.debug(cmd)
 
         return self.process_monitor.run_process_async(
-            cmd=cmd, daemon=daemon, cwd=cwd, env=env
+            cmd=cmd, sudo=self.sudo, daemon=daemon, cwd=cwd, env=env
         )
