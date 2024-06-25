@@ -33,7 +33,7 @@ class HostShell(object):
         """
 
         if self.sudo:
-            cmd = "sudo -S -- " + cmd
+            cmd = "sudo -S -E " + cmd
 
         if env is None:
             env = os.environ.copy()
@@ -53,7 +53,7 @@ class HostShell(object):
         """
 
         if self.sudo:
-            cmd = "sudo -S -- " + cmd
+            cmd = "sudo -S -E " + cmd
 
         if env is None:
             env = os.environ.copy()

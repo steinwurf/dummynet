@@ -13,19 +13,18 @@ from . import run_info
 cached_sudo_password = None
 
 
-def get_sudo_password():
-    """Get the sudo password from the user"""
+def update_sudo_password():
+    """Cache the sudo password"""
 
     global cached_sudo_password
 
     if cached_sudo_password:
-        return cached_sudo_password
+        # We already have a password cached
+        return
 
     prompt = f"\n[sudo] password for {getpass.getuser()}: "
 
     cached_sudo_password = getpass.getpass(prompt=prompt) + "\n"
-
-    return cached_sudo_password
 
 
 class ProcessMonitor:
@@ -72,6 +71,7 @@ class ProcessMonitor:
                 return
 
             self.log.debug(f"Poller: read {len(data)} bytes from fd {fd}")
+            self.log.debug(f"Poller: data: '{data}'")
 
             # Call the callback
             self.fds[fd](data.decode(encoding="utf-8", errors="replace"))
@@ -108,6 +108,9 @@ class ProcessMonitor:
         ):
             """Construct a new process object."""
 
+            if sudo:
+                update_sudo_password()
+
             self.popen = subprocess.Popen(
                 cmd,
                 stdin=subprocess.PIPE,
@@ -123,6 +126,11 @@ class ProcessMonitor:
                 # https://alexandra-zaharia.github.io/posts/kill-subprocess-and-its-children-on-timeout-python/
                 start_new_session=True,
             )
+
+            # Pipe the sudo password to the process
+            if sudo:
+                self.popen.stdin.write(cached_sudo_password)
+                self.popen.stdin.flush()
 
             self.info = run_info.RunInfo(
                 cmd=cmd,
@@ -166,11 +174,6 @@ class ProcessMonitor:
                 self.popen.stderr.fileno(),
                 stderr_callback,
             )
-
-            # Pipe the sudo password to the process
-            if sudo:
-                self.popen.stdin.write(get_sudo_password())
-                self.popen.stdin.flush()
 
             if not is_async:
 
