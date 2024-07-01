@@ -5,6 +5,10 @@ every change, see the Git log.
 
 Latest
 ------
+* tbd
+
+3.0.0
+-----
 * Major: Requires Python 3.11 or later (due to use of ExceptionGroup).
 * Major: Rename `ProcessMonitor.run`to `ProcessMonitor.keep_running`.
 
