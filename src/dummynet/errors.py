@@ -16,8 +16,8 @@ class RunInfoError(DummyNetError):
 class TimeoutError(DummyNetError):
     """Exception for timeout errors"""
 
-    def __init__(self, message):
-        super().__init__(message)
+    def __init__(self, info):
+        super().__init__(str(info))
 
 
 class MatchError(DummyNetError):
@@ -31,7 +31,7 @@ class MatchError(DummyNetError):
         :param output: The output to match against
         """
 
-        message = f"Could not match '{pattern}' in {stream_name} output:\n" + output
+        message = f"Could not match '{pattern}' in {stream_name} output:\n{output}"
 
         super().__init__(message)
 
@@ -41,8 +41,8 @@ class DaemonExitError(DummyNetError):
     daemon processes.
     """
 
-    def __init__(self, process):
-        super().__init__(f"Unexpected daemon exit: {process.info} ")
+    def __init__(self, info):
+        super().__init__(f"Unexpected daemon exit: {str(info)} ")
 
 
 class AllDaemonsError(DummyNetError):

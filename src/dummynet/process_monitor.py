@@ -1,9 +1,30 @@
 import select
 import textwrap
 import os
+import subprocess
+import signal
+import getpass
 
 from . import errors
 from . import process
+from . import run_info
+
+# The cached sudo password
+cached_sudo_password = None
+
+
+def update_sudo_password():
+    """Cache the sudo password"""
+
+    global cached_sudo_password
+
+    if cached_sudo_password:
+        # We already have a password cached
+        return
+
+    prompt = f"\n[sudo] password for {getpass.getuser()}: "
+
+    cached_sudo_password = getpass.getpass(prompt=prompt) + "\n"
 
 
 class ProcessMonitor:
@@ -50,6 +71,7 @@ class ProcessMonitor:
                 return
 
             self.log.debug(f"Poller: read {len(data)} bytes from fd {fd}")
+            self.log.debug(f"Poller: data: '{data}'")
 
             # Call the callback
             self.fds[fd](data.decode(encoding="utf-8", errors="replace"))
@@ -57,7 +79,8 @@ class ProcessMonitor:
         def poll(self, timeout):
             fds = self.poller.poll(timeout)
 
-            self.log.debug(f"Poller: got {len(fds)} events")
+            if len(fds) > 0:
+                self.log.debug(f"Poller: got {len(fds)} events")
 
             # First if we have any events, we need to read from the
             # file descriptors
@@ -72,210 +95,212 @@ class ProcessMonitor:
                 elif event & select.POLLERR:
                     self.del_fd(fd=fd)
 
+        def wait_fd(self, fd):
+
+            while fd in self.fds:
+                self.poll(timeout=0.1)
+
     class Process:
         """A process object to track the state of a process"""
 
-        def __init__(self, popen, info):
-            """Construct a new process object.
+        def __init__(
+            self, cmd: str, cwd, env, sudo, is_async, is_daemon, timeout, poller
+        ):
+            """Construct a new process object."""
 
-            :param popen: The subprocess.Popen object
-            :param info: The dummynet.RunInfo object
-            """
+            if sudo:
+                update_sudo_password()
 
-            self.popen = popen
-            self.info = info
+            self.popen = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=cwd,
+                env=env,
+                shell=True,
+                # Get stdout and stderr as text
+                text=True,
+                # Make sure we can kill the process and the subprocesses
+                # it may create:
+                # https://alexandra-zaharia.github.io/posts/kill-subprocess-and-its-children-on-timeout-python/
+                start_new_session=True,
+            )
 
-    class Stopped:
-        """The stopped state. This is the initial and final state of the monitor."""
+            # Pipe the sudo password to the process
+            if sudo:
+                self.popen.stdin.write(cached_sudo_password)
+                self.popen.stdin.flush()
 
-        def __init__(self):
-            pass
-
-    class Initializing:
-        """The initializing state here we collect the processes to monitor."""
-
-        def __init__(self):
-            self.running = []
-
-        def add_process(self, process):
-            self.running.append(process)
-
-        def validate(self):
-            try:
-                self._validate()
-            except Exception:
-                # Kill all processes
-                for process in self.running:
-                    process.popen.kill()
-                raise
-
-        def _validate(self):
-            if not self.running:
-                # No processes in running or died
-                raise errors.NoProcessesError()
-
-            # Check that we have non daemon processes
-            for process in self.running:
-                if not process.info.is_daemon:
-                    return
-
-            raise errors.AllDaemonsError()
-
-    class Running:
-        """The running state. Here we monitor the processes."""
-
-        def __init__(self, log):
-            # A dictionary of running processes
-            self.running = []
-
-            # List of died processes
-            self.died = []
-
-            # The poller is used to wait for processes to terminate
-            self.poller = ProcessMonitor.Poller(log=log)
-
-            self.log = log
-
-        def add_process(self, process):
-            # Make sure the process is running
-            process.popen.poll()
-
-            # The returncode should be None if the process is running
-            if not process.popen.returncode is None:
-                process.info.returncode = process.popen.returncode
-                process.info.stdout, process.info.stderr = process.popen.communicate()
-
-                raise errors.ProcessExitError(process)
-
-            self.running.append(process)
+            self.info = run_info.RunInfo(
+                cmd=cmd,
+                cwd=cwd,
+                pid=self.popen.pid,
+                stdout="",
+                stderr="",
+                returncode=None,
+                is_async=is_async,
+                is_daemon=is_daemon,
+                timeout=timeout,
+            )
 
             def stdout_callback(data):
-                process.info.stdout += data
 
-                if process.info.stdout_callback:
-                    process.info.stdout_callback(data)
+                if self.info.stdout is None:
+                    self.info.stdout = data
+                else:
+                    self.info.stdout += data
+
+                if self.info.stdout_callback:
+                    self.info.stdout_callback(data)
 
             def stderr_callback(data):
-                process.info.stderr += data
 
-                if process.info.stderr_callback:
-                    process.info.stderr_callback(data)
+                if self.info.stderr is None:
+                    self.info.stderr = data
+                else:
+                    self.info.stderr += data
+
+                if self.info.stderr_callback:
+                    self.info.stderr_callback(data)
 
             # Get the file descriptor
-            self.poller.add_fd(
-                process.popen.stdout.fileno(),
+            poller.add_fd(
+                self.popen.stdout.fileno(),
                 stdout_callback,
             )
 
-            self.poller.add_fd(
-                process.popen.stderr.fileno(),
+            poller.add_fd(
+                self.popen.stderr.fileno(),
                 stderr_callback,
             )
 
-        def poll(self, timeout):
-            # Poll for events
-            self.poller.poll(timeout)
+            if not is_async:
 
-            # Check if any process has died
-            for process in self.running:
-                process.popen.poll()
+                try:
+                    self.info.returncode = self.popen.wait(timeout=self.info.timeout)
 
-                if process.popen.returncode is not None:
-                    self._died(process=process)
+                    poller.wait_fd(self.popen.stdout.fileno())
+                    poller.wait_fd(self.popen.stderr.fileno())
 
-        def _died(self, process):
-            self.died.append(process)
-            self.running.remove(process)
+                    if self.info.returncode != 0:
+                        raise errors.RunInfoError(info=self.info)
 
-            # Set the return code
-            process.info.returncode = process.popen.returncode
+                except subprocess.TimeoutExpired:
 
-            # Check if we had a normal exit
-            if process.popen.returncode:
-                # The process had a non-zero return code
-                raise errors.RunInfoError(info=process.info)
+                    # The process did not exit
+                    #
+                    # This approach is taken from the subprocess documentation:
+                    # https://docs.python.org/3/library/subprocess.html#subprocess.Popen.communicate
 
-            if process.info.is_daemon:
-                # The process was a daemon - these should not exit
-                # until after the test is over
-                raise errors.DaemonExitError(process)
+                    self.stop()
+
+                    poller.wait_fd(self.popen.stdout.fileno())
+                    poller.wait_fd(self.popen.stderr.fileno())
+
+                    raise errors.TimeoutError(info=self.info)
+
+        def is_running(self):
+            """Poll the process and update the return code"""
+
+            if self.info.returncode is not None:
+                return True
+
+            self.info.returncode = self.popen.poll()
+
+            return self.info.returncode is None
 
         def stop(self):
-            """Stop all running processes."""
+            """Stop a process"""
 
-            self.log.debug("Stopping all processes")
+            self.info.returncode = self.popen.poll()
 
-            for process in self.running:
-                self.poller.del_fd(process.popen.stdout.fileno())
-                self.poller.del_fd(process.popen.stderr.fileno())
+            if self.info.returncode is not None:
+                return
 
-                process.popen.kill()
+            # See start_new_sesstion in __init__ for why we use os.killpg
+            os.killpg(os.getpgid(self.popen.pid), signal.SIGTERM)
 
-        def run(self, timeout):
             try:
-                # Poll for events
-                self.poll(timeout=timeout)
-                return self.keep_running()
+                self.info.returncode = self.popen.wait(timeout=0.5)
 
-            except Exception:
-                # Stop all processes
-                self.stop()
-                raise
-
-        def keep_running(self):
-            """Check if the test is over.
-
-            The ProcessMonitor should continue running for as long as there
-            are non daemon processes active.
-            """
-
-            for process in self.running:
-                if not process.info.is_daemon:
-                    # A process which is not a daemon is still running
-                    return True
-
-            # Only daemon processes running
-            return False
+            except subprocess.TimeoutExpired:
+                os.killpg(os.getpgid(self.popen.pid), signal.SIGKILL)
+                self.info.returncode = self.popen.wait()
 
     def __init__(self, log):
         """Create a new test monitor"""
 
-        # The state of the monitor
-        self.state = ProcessMonitor.Stopped()
-
         # The log object
         self.log = log
 
-    def stop(self):
-        """Stop all processes"""
+        # Daemons
+        self.daemons = []
 
-        if isinstance(self.state, ProcessMonitor.Stopped):
-            raise RuntimeError("Monitor in stopped state")
+        # Programs (still running)
+        self.processes = []
 
-        if isinstance(self.state, ProcessMonitor.Initializing):
-            raise RuntimeError("Monitor in initializing state")
+        # The poller is used to wait for processes to terminate
+        self.poller = ProcessMonitor.Poller(log=log)
 
-        if isinstance(self.state, ProcessMonitor.Running):
-            self.state.stop()
-            self.state = ProcessMonitor.Stopped()
-        else:
-            assert False, "Unknown state"
+    def run_process(self, cmd: str, sudo, cwd=None, env=None, timeout=None):
 
-    def add_process(self, popen, info):
-        """Add a process to the monitor.
+        try:
+            process = ProcessMonitor.Process(
+                cmd=cmd,
+                cwd=cwd,
+                env=env,
+                sudo=sudo,
+                is_async=False,
+                is_daemon=False,
+                timeout=timeout,
+                poller=self.poller,
+            )
 
-        :param popen: The subprocess.Popen object
-        :param info: The dummynet.RunInfo object
-        """
+            return process.info
+        except Exception as e:
 
-        if isinstance(self.state, ProcessMonitor.Stopped):
-            self.state = ProcessMonitor.Initializing()
+            # Before we raise the exception we check if any other
+            # errors have occoured
 
-        process = ProcessMonitor.Process(popen=popen, info=info)
+            try:
+                self._validate_state()
+            except Exception as nested:
+                raise ExceptionGroup("Run failure", [e, nested])
 
-        self.state.add_process(process=process)
+            # Re-raise the exception to make sure the caller knows
+            raise
 
-    def run(self, timeout=500):
+    def run_process_async(self, cmd: str, sudo, daemon=False, cwd=None, env=None):
+        try:
+            process = ProcessMonitor.Process(
+                cmd=cmd,
+                cwd=cwd,
+                env=env,
+                sudo=sudo,
+                is_async=True,
+                is_daemon=daemon,
+                timeout=None,
+                poller=self.poller,
+            )
+
+            if daemon:
+                self.daemons.append(process)
+            else:
+                self.processes.append(process)
+
+            return process.info
+
+        except:
+
+            # Before we raise the exception we check if any other
+            # errors have occoured
+            self._validate_state()
+
+            # Re-raise the exception to make sure the caller knows
+            raise
+
+    def keep_running(self, timeout=0.1):
         """Run the process monitor.
 
         :param timeout: A timeout in milliseconds. If this timeout
@@ -287,34 +312,59 @@ class ProcessMonitor:
             The following simple loop can be used to keep the monitor
             running while waiting for processes to exit:
 
-                while test_monitor.run():
+                while test_monitor.keep_running():
                     pass
         """
 
-        try:
-            return self._run(timeout=timeout)
+        # Check if we have any proccesses to wait for
+        if not self.processes and self.daemons:
+            raise errors.NoProcessesError()
 
-        except Exception as e:
-            self.state = ProcessMonitor.Stopped()
-            raise e
+        # Poll for output
+        self.poller.poll(timeout)
 
-    def _run(self, timeout):
-        if isinstance(self.state, ProcessMonitor.Stopped):
-            # It ok to be in the stopped state here. Likely it is the user
-            # who has called stop() in the while run() loop.
-            return False
+        self._validate_state()
 
-        if isinstance(self.state, ProcessMonitor.Initializing):
-            # We are waiting to run
-            self.state.validate()
+        # Check if there are any non-daemon processes running
+        for process in self.processes:
+            if process.info.returncode is None:
+                return True
 
-            # Switch to the running state
-            running = ProcessMonitor.Running(log=self.log)
+        return False
 
-            for process in self.state.running:
-                running.add_process(process)
+    def stop(self):
+        """Stop all processes"""
 
-            self.state = running
+        self._validate_state()
 
-        # We are in the running state
-        return self.state.run(timeout=timeout)
+        for process in self.processes:
+            process.stop()
+
+        for daemon in self.daemons:
+            daemon.stop()
+
+        # Poll for output
+        self.poller.poll(timeout=0.1)
+
+        self.processes = []
+        self.daemons = []
+
+    def _validate_state(self):
+
+        # Check if any processes have died with an error
+        exceptions = []
+
+        for process in self.processes:
+
+            if process.is_running():
+                continue
+
+            if process.info.returncode != 0:
+                exceptions.append(errors.RunInfoError(info=process.info))
+
+        for daemon in self.daemons:
+            if not daemon.is_running():
+                exceptions.append(errors.DaemonExitError(info=daemon.info))
+
+        if exceptions:
+            raise ExceptionGroup("Invalid state", exceptions)

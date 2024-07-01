@@ -14,6 +14,7 @@ class RunInfo:
     :ivar returncode: see :meth:`RunInfo.__init__`
     :ivar is_async: see :meth:`RunInfo.__init__`
     :ivar is_daemon: see :meth:`RunInfo.__init__`
+    :ivar timeout: see :meth:`RunInfo.__init__`
     :ivar stdout_callback: The callback to be called when the standard output
                             stream is received  (default: None). The callback
                             should accept a single argument which is the data
@@ -24,7 +25,9 @@ class RunInfo:
                             received.
     """
 
-    def __init__(self, cmd, cwd, pid, stdout, stderr, returncode, is_async, is_daemon):
+    def __init__(
+        self, cmd, cwd, pid, stdout, stderr, returncode, is_async, is_daemon, timeout
+    ):
         """Create a new object
 
         :param cmd: The command that was executed
@@ -35,6 +38,7 @@ class RunInfo:
         :param returncode: The return code set after invoking the command
         :param is_async: Whether the command was run asynchronously
         :param is_daemon: Whether the command was run as a daemon
+        :param timeout: The timeout in seconds, if None then no timeout
         """
 
         self.cmd = cmd
@@ -47,6 +51,7 @@ class RunInfo:
         self.is_daemon = is_daemon
         self.stdout_callback = None
         self.stderr_callback = None
+        self.timeout = timeout
 
     def match(self, stdout=None, stderr=None):
         """Matches the lines in the output with the pattern. The match
@@ -90,6 +95,11 @@ class RunInfo:
         :param output: The output to match against
         """
 
+        if output is None:
+            raise errors.MatchError(
+                pattern=pattern, stream_name=stream_name, output=output
+            )
+
         match_lines = fnmatch.filter(output.splitlines(), pattern)
 
         if len(match_lines) == 0:
@@ -109,6 +119,7 @@ class RunInfo:
             "stderr: \n{stderr}"
             "is_async: {is_async}\n"
             "is_daemon: {is_daemon}\n"
+            "timeout: {timeout}\n"
         )
 
         return run_string.format(
@@ -120,4 +131,5 @@ class RunInfo:
             stderr=self.stderr,
             is_async=self.is_async,
             is_daemon=self.is_daemon,
+            timeout=self.timeout,
         )

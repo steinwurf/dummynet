@@ -133,37 +133,37 @@ def _pytest_dev(bld):
 
 def _pytest_run(bld):
 
-    with bld.create_virtualenv(overwrite=True) as venv:
-        venv.run("python -m pip install -r test/requirements.txt")
+    venv = bld.create_virtualenv(overwrite=True)
+    venv.run("python -m pip install -r test/requirements.txt")
 
-        # Install the dummynet plugin in the virtualenv
-        wheel = _find_wheel(ctx=bld)
+    # Install the dummynet plugin in the virtualenv
+    wheel = _find_wheel(ctx=bld)
 
-        venv.run(f"python -m pip install {wheel}")
+    venv.run(f"python -m pip install {wheel}")
 
-        # Added our systems path to the virtualenv
-        venv.env["PATH"] = os.path.pathsep.join([venv.env["PATH"], os.environ["PATH"]])
+    # Added our systems path to the virtualenv
+    venv.env["PATH"] = os.path.pathsep.join([venv.env["PATH"], os.environ["PATH"]])
 
-        # We override the pytest temp folder with the basetemp option,
-        # so the test folders will be available at the specified location
-        # on all platforms. The default location is the "pytest" local folder.
-        basetemp = os.path.abspath(os.path.expanduser(bld.options.pytest_basetemp))
+    # We override the pytest temp folder with the basetemp option,
+    # so the test folders will be available at the specified location
+    # on all platforms. The default location is the "pytest" local folder.
+    basetemp = os.path.abspath(os.path.expanduser(bld.options.pytest_basetemp))
 
-        # We need to manually remove the previously created basetemp folder,
-        # because pytest uses os.listdir in the removal process, and that fails
-        # if there are any broken symlinks in that folder.
-        if os.path.exists(basetemp):
-            waflib.extras.wurf.directory.remove_directory(path=basetemp)
+    # We need to manually remove the previously created basetemp folder,
+    # because pytest uses os.listdir in the removal process, and that fails
+    # if there are any broken symlinks in that folder.
+    if os.path.exists(basetemp):
+        waflib.extras.wurf.directory.remove_directory(path=basetemp)
 
-        # Run all tests by just passing the test directory. Specific tests can
-        # be enabled by specifying the full path e.g.:
-        #
-        #     'test/test_run.py::test_create_context'
-        #
-        test_filter = "test"
+    # Run all tests by just passing the test directory. Specific tests can
+    # be enabled by specifying the full path e.g.:
+    #
+    #     'test/test_run.py::test_create_context'
+    #
+    test_filter = "test"
 
-        # Main test command
-        venv.run(f"python -B -m pytest {test_filter} --basetemp {basetemp}")
+    # Main test command
+    venv.run(f"python -B -m pytest {test_filter} --basetemp {basetemp}")
 
-        # Check the package
-        venv.run(f"twine check {wheel}")
+    # Check the package
+    venv.run(f"twine check {wheel}")

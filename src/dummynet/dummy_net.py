@@ -6,7 +6,6 @@ from logging import Logger
 
 
 class DummyNet(object):
-
     """A DummyNet object is used to create a network of virtual ethernet
     devices and bind them to namespaces.
     """
@@ -301,14 +300,15 @@ class DummyNet(object):
         for cleaner in self.cleaners:
             cleaner()
 
-    def add_cgroup(self,
-                   name: str,
-                   shell,
-                   log: Logger,
-                   default_path: str = "/sys/fs/cgroup",
-                   controllers: dict = {"cpu.max": None,
-                                      "memory.high": None},
-                   pid=None):
+    def add_cgroup(
+        self,
+        name: str,
+        shell,
+        log: Logger,
+        default_path: str = "/sys/fs/cgroup",
+        controllers: dict = {"cpu.max": None, "memory.high": None},
+        pid=None,
+    ):
         """
         Creates a new cgroup object.
 
@@ -318,15 +318,21 @@ class DummyNet(object):
         :param default_path: The default path for cgroups. Defaults to "/sys/fs/cgroup".
         :param controllers: Dictionary of controllers as keys and limits as values. Defaults to {"cpu.max": None, "memory.high": None}.
         :param pid: The process ID to add to the cgroup. Defaults to None.
-        
+
         :return: A CGroup object.
         """
-        cgroup = CGroup(name=name, shell=shell, log=log, default_path=default_path, controllers=controllers, pid=pid)
+        cgroup = CGroup(
+            name=name,
+            shell=shell,
+            log=log,
+            default_path=default_path,
+            controllers=controllers,
+            pid=pid,
+        )
         self.cgroups.append(cgroup)
         return cgroup
-    
+
     def cgroup_cleanup(self):
         """Cleans up all the created cgroups."""
         for c in self.cgroups:
             c.hard_clean()
-    
