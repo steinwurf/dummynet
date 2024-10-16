@@ -5,12 +5,36 @@ import subprocess
 import signal
 import getpass
 
+from functools import lru_cache
+from typing import Optional
+
 from . import errors
 from . import process
 from . import run_info
 
 # The cached sudo password
-cached_sudo_password = None
+cached_sudo_password: Optional[str] = None
+
+
+@lru_cache(maxsize=None)
+def sudo_requires_password() -> bool:
+    try:
+        # Run 'sudo' to check if sudo requires a password
+        # '--non-interactive' ensures sudo throws if it requires a password
+        # '--reset-timestamp' ensures we ignore any possible cached credentials
+        subprocess.run(
+            ["sudo", "--non-interactive", "--reset-timestamp", "true"],
+            check=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return False  # No password required
+    except subprocess.CalledProcessError as e:
+        if e.returncode == 1:
+            return True  # Password required
+        else:
+            return False  # Some other error, assuming no password required
 
 
 def update_sudo_password():
@@ -20,6 +44,15 @@ def update_sudo_password():
 
     if cached_sudo_password:
         # We already have a password cached
+        return
+
+    if not sudo_requires_password():
+        # Sudo requires no password, skip prompting for one
+        return
+
+    cached_sudo_password = os.environ.get("DUMMYNET_SUDO_PASSWD", None)
+    if cached_sudo_password:
+        # Environment variable was set, use it instead of asking for a password
         return
 
     prompt = f"\n[sudo] password for {getpass.getuser()}: "
@@ -127,8 +160,8 @@ class ProcessMonitor:
                 start_new_session=True,
             )
 
-            # Pipe the sudo password to the process
-            if sudo:
+            # Pipe possible sudo password to the process
+            if sudo and (cached_sudo_password != None):
                 self.popen.stdin.write(cached_sudo_password)
                 self.popen.stdin.flush()
 
