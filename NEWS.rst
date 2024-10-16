@@ -5,7 +5,11 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Major: Sudo now ignores the user's cached credentials to avoid losing the
+  caching during a run.
+* Minor: Sudo will now utilize passwordless sudo when available.
+* Minor: Allow environment variable `DUMMYNET_SUDO_PASSWD` as an alternative to
+  setting the sudo password from stdin.
 
 3.0.0
 -----
