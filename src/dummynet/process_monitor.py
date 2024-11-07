@@ -98,16 +98,18 @@ class ProcessMonitor:
             self.log.debug(f"Poller: unregister process fd {fd}")
 
         def read_fd(self, fd):
-            data = os.read(fd, 4096)
+            # Keep reading until we have read all data
+            while True:
+                data = os.read(fd, 4096)
+                if not data:
+                    # No more data to read
+                    return
 
-            if not data:
-                return
+                self.log.debug(f"Poller: read {len(data)} bytes from fd {fd}")
+                self.log.debug(f"Poller: data: '{data}'")
 
-            self.log.debug(f"Poller: read {len(data)} bytes from fd {fd}")
-            self.log.debug(f"Poller: data: '{data}'")
-
-            # Call the callback
-            self.fds[fd](data.decode(encoding="utf-8", errors="replace"))
+                # Call the callback
+                self.fds[fd](data.decode(encoding="utf-8", errors="replace"))
 
         def poll(self, timeout):
             fds = self.poller.poll(timeout)

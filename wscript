@@ -26,6 +26,12 @@ def options(opt):
     )
 
     gr.add_option(
+        "--filter",
+        default=None,
+        help='Select tests based on their name. E.g. "test_run_stdout"',
+    )
+
+    gr.add_option(
         "--pytest_basetemp",
         default="pytest_temp",
         help="Set the basetemp folder where pytest executes the tests",
@@ -44,6 +50,7 @@ def build(bld):
     # Create a virtualenv in the source folder and build universal wheel
     with bld.create_virtualenv() as venv:
 
+        venv.run(cmd="python -m pip install setuptools")
         venv.run(cmd="python -m pip install wheel")
         venv.run(cmd="python setup.py bdist_wheel --universal", cwd=bld.path)
 
@@ -122,7 +129,7 @@ def _pytest(bld):
         _pytest_dev(bld=bld)
 
     else:
-        _pytest_run(bld=bld)
+        _pytest_run(ctx=bld)
 
 
 def _pytest_dev(bld):
@@ -131,13 +138,13 @@ def _pytest_dev(bld):
     venv.run("python -m pip install -e .")
 
 
-def _pytest_run(bld):
+def _pytest_run(ctx):
 
-    venv = bld.create_virtualenv(overwrite=True)
+    venv = ctx.create_virtualenv(overwrite=True)
     venv.run("python -m pip install -r test/requirements.txt")
 
     # Install the dummynet plugin in the virtualenv
-    wheel = _find_wheel(ctx=bld)
+    wheel = _find_wheel(ctx=ctx)
 
     venv.run(f"python -m pip install {wheel}")
 
@@ -147,7 +154,7 @@ def _pytest_run(bld):
     # We override the pytest temp folder with the basetemp option,
     # so the test folders will be available at the specified location
     # on all platforms. The default location is the "pytest" local folder.
-    basetemp = os.path.abspath(os.path.expanduser(bld.options.pytest_basetemp))
+    basetemp = os.path.abspath(os.path.expanduser(ctx.options.pytest_basetemp))
 
     # We need to manually remove the previously created basetemp folder,
     # because pytest uses os.listdir in the removal process, and that fails
@@ -155,12 +162,9 @@ def _pytest_run(bld):
     if os.path.exists(basetemp):
         waflib.extras.wurf.directory.remove_directory(path=basetemp)
 
-    # Run all tests by just passing the test directory. Specific tests can
-    # be enabled by specifying the full path e.g.:
-    #
-    #     'test/test_run.py::test_create_context'
-    #
-    test_filter = "test"
+    test_filter = ""
+    if ctx.options.filter:
+        test_filter = f"-k '{ctx.options.filter}'"
 
     # Main test command
     venv.run(f"python -B -m pytest {test_filter} --basetemp {basetemp}")

@@ -5,7 +5,8 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Patch: Fix issue where the output of a process was being truncated at 4096
+  bytes.
 
 4.0.0
 -----

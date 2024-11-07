@@ -263,49 +263,118 @@ def test_hostshell_timeout():
         pass
 
 
-@pytest.fixture
-def sad_path():
+def _hostshell_timeout_daemon():
+    # Seperated this in to a function to look like a typical integration
+    # test
 
     # Check if we need to run as sudo
     sudo = os.getuid() != 0
 
+    # Create a process monitor
     process_monitor = ProcessMonitor(log=log)
+
+    # The host shell
     shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-    net = DummyNet(shell=shell)
 
-    sad_cgroup = net.add_cgroup(
-        name="test_cgroup_sad",
-        shell=shell,
-        log=log,
-        default_path="/sys/fs/cgroup",
-        controllers={"cpu.wrongname": 0, "memory.high": -200000000},
-        pid=12345,
-    )
-    return sad_cgroup
+    # Start a deamon process (those should not exit before the test is over)
+    shell.run_async(cmd="sleep 2", daemon=True)
+
+    # Next we run a blocking command that will timeout
+    # we expect to also be notified that the daemon process exited
+    # prematurely
+
+    shell.run(cmd="sleep 10", timeout=5)
+
+    # Nothing to do
+    while process_monitor.keep_running():
+        pass
 
 
-@pytest.fixture
-def happy_path():
+def test_hostshell_timeout_daemon():
 
-    # Check if we need to run as sudo
-    sudo = os.getuid() != 0
+    # Check that we get a timeout if we run a command that takes too long
 
+    with pytest.raises(ExceptionGroup) as e:
+        _hostshell_timeout_daemon()
+
+    assert e.group_contains(dummynet.TimeoutError)
+    assert e.group_contains(dummynet.DaemonExitError)
+
+
+def test_run_stdout():
+
+    # Create a process monitor
     process_monitor = ProcessMonitor(log=log)
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-    net = DummyNet(shell=shell)
 
-    happy_cgroup = net.add_cgroup(
-        name="test_cgroup_happy",
-        shell=shell,
-        log=log,
-        default_path="/sys/fs/cgroup",
-        controllers={"cpu.max": 0.5, "memory.high": 200000000},
-        pid=os.getpid(),
-    )
-    return happy_cgroup
+    # The host shell used if we don't have a recording
+    shell = HostShell(log=log, sudo=False, process_monitor=process_monitor)
+    message = "Hello World"
+    info = shell.run(cmd=f"echo '{message}'")
+
+    assert len(info.stdout) == len(message) + 1
+    assert info.stdout == f"{message}\n"
+
+    long_message = "A" * 4096
+
+    info = shell.run(cmd=f"echo '{long_message}'")
+
+    assert len(info.stdout) == 4096 + 1
+    assert info.stdout == f"{long_message}\n"
+
+    very_long_message = "A" * 4096 * 10
+
+    info = shell.run(cmd=f"echo '{very_long_message}'")
+
+    assert len(info.stdout) == 4096 * 10 + 1
+    assert info.stdout == f"{very_long_message}\n"
+
+    # check timeout of function with a long message
+    with pytest.raises(dummynet.TimeoutError):
+        shell.run(cmd=f"sleep 10; echo '{very_long_message}'", timeout=1)
 
 
 # @todo re-enable this test
+# @pytest.fixture
+# def sad_path():
+
+#     # Check if we need to run as sudo
+#     sudo = os.getuid() != 0
+
+#     process_monitor = ProcessMonitor(log=log)
+#     shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+#     net = DummyNet(shell=shell)
+
+#     sad_cgroup = net.add_cgroup(
+#         name="test_cgroup_sad",
+#         shell=shell,
+#         log=log,
+#         default_path="/sys/fs/cgroup",
+#         controllers={"cpu.wrongname": 0, "memory.high": -200000000},
+#         pid=12345,
+#     )
+#     return sad_cgroup
+
+
+# @pytest.fixture
+# def happy_path():
+
+#     # Check if we need to run as sudo
+#     sudo = os.getuid() != 0
+
+#     process_monitor = ProcessMonitor(log=log)
+#     shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+#     net = DummyNet(shell=shell)
+
+#     happy_cgroup = net.add_cgroup(
+#         name="test_cgroup_happy",
+#         shell=shell,
+#         log=log,
+#         default_path="/sys/fs/cgroup",
+#         controllers={"cpu.max": 0.5, "memory.high": 200000000},
+#         pid=os.getpid(),
+#     )
+#     return happy_cgroup
+
 # def test_cgroup_build(happy_path):
 #     cgroup_build = happy_path
 
@@ -381,41 +450,3 @@ def happy_path():
 #         cgroup_cleanup.hard_clean()
 #     except dummynet.errors.RunInfoError as e:
 #         assert "No such file or directory" in str(e)
-
-
-def _hostshell_timeout_daemon():
-    # Seperated this in to a function to look like a typical integration
-    # test
-
-    # Check if we need to run as sudo
-    sudo = os.getuid() != 0
-
-    # Create a process monitor
-    process_monitor = ProcessMonitor(log=log)
-
-    # The host shell
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-
-    # Start a deamon process (those should not exit before the test is over)
-    shell.run_async(cmd="sleep 2", daemon=True)
-
-    # Next we run a blocking command that will timeout
-    # we expect to also be notified that the daemon process exited
-    # prematurely
-
-    shell.run(cmd="sleep 10", timeout=5)
-
-    # Nothing to do
-    while process_monitor.keep_running():
-        pass
-
-
-def test_hostshell_timeout_daemon():
-
-    # Check that we get a timeout if we run a command that takes too long
-
-    with pytest.raises(ExceptionGroup) as e:
-        _hostshell_timeout_daemon()
-
-    assert e.group_contains(dummynet.TimeoutError)
-    assert e.group_contains(dummynet.DaemonExitError)
