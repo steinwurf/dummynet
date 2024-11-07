@@ -53,6 +53,7 @@ def update_sudo_password():
     cached_sudo_password = os.environ.get("DUMMYNET_SUDO_PASSWD", None)
     if cached_sudo_password:
         # Environment variable was set, use it instead of asking for a password
+        cached_sudo_password += "\n"
         return
 
     prompt = f"\n[sudo] password for {getpass.getuser()}: "
@@ -98,18 +99,21 @@ class ProcessMonitor:
             self.log.debug(f"Poller: unregister process fd {fd}")
 
         def read_fd(self, fd):
-            # Keep reading until we have read all data
+            outputs = []
             while True:
-                data = os.read(fd, 4096)
-                if not data:
-                    # No more data to read
-                    return
+                self.log.debug(f"Poller: reading from fd {fd}")
+                output = os.read(fd, 4096)
+                if not output:
+                    self.log.debug(f"Poller: no more to read from fd {fd}")
+                    break
+                outputs.append(output)
 
-                self.log.debug(f"Poller: read {len(data)} bytes from fd {fd}")
-                self.log.debug(f"Poller: data: '{data}'")
+            data = b"".join(outputs)
+            self.log.debug(f"Poller: read {len(data)} bytes from fd {fd}")
+            self.log.debug(f"Poller: data: '{data}'")
 
-                # Call the callback
-                self.fds[fd](data.decode(encoding="utf-8", errors="replace"))
+            # Call the callback
+            self.fds[fd](data.decode(encoding="utf-8", errors="replace"))
 
         def poll(self, timeout):
             fds = self.poller.poll(timeout)
@@ -163,7 +167,7 @@ class ProcessMonitor:
             )
 
             # Pipe possible sudo password to the process
-            if sudo and (cached_sudo_password != None):
+            if sudo and (cached_sudo_password is not None):
                 self.popen.stdin.write(cached_sudo_password)
                 self.popen.stdin.flush()
 

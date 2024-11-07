@@ -167,7 +167,7 @@ def _pytest_run(ctx):
         test_filter = f"-k '{ctx.options.filter}'"
 
     # Main test command
-    venv.run(f"python -B -m pytest {test_filter} --basetemp {basetemp}")
+    venv.run(f"python -B -m pytest -xrA {test_filter} --basetemp {basetemp}")
 
     # Check the package
     venv.run(f"twine check {wheel}")
