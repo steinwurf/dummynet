@@ -93,8 +93,8 @@ def run():
         proc1.match(stdout="10 packets transmitted*", stderr=None)
 
         # Since proc0 is a daemon we automatically kill it when the last
-        # non-daemon process is done. However we can still see the output it
-        # generated.
+        # non-daemon process is done. However we can still see the output
+        # it generated.
         print(f"proc0: {proc0.stdout}")
 
     finally:
