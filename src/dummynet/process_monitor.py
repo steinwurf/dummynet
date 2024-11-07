@@ -98,17 +98,34 @@ class ProcessMonitor:
 
             self.log.debug(f"Poller: unregister process fd {fd}")
 
-        def read_fd(self, fd):
-            outputs = []
-            while True:
-                self.log.debug(f"Poller: reading from fd {fd}")
-                output = os.read(fd, 4096)
-                if not output:
-                    self.log.debug(f"Poller: no more to read from fd {fd}")
-                    break
-                outputs.append(output)
+        # def read_fd(self, fd):
 
-            data = b"".join(outputs)
+        #     self.log.error(f"Poller: reading from fd {fd}")
+        #     data = os.read(fd, 4096)  # Read in chunks of 4096 bytes
+        #     self.log.error(f"Poller: read {len(data)}")
+
+        #     if not data:
+        #         return
+
+        #     self.log.debug(f"Poller: read {len(data)} bytes from fd {fd}")
+        #     self.log.debug(f"Poller: data: '{data}'")
+
+        #     # Call the callback
+        #     self.fds[fd](data.decode(encoding="utf-8", errors="replace"))
+
+        def read_fd(self, fd):
+            data = b""
+            while True:
+                self.log.error(f"Poller: reading from fd {fd}")
+                chunk = os.read(fd, 4096)  # Read in chunks of 4096 bytes
+                self.log.error(f"Poller: read {len(chunk)}")
+                if not chunk:
+                    break
+                data += chunk
+
+            if not data:
+                return
+
             self.log.debug(f"Poller: read {len(data)} bytes from fd {fd}")
             self.log.debug(f"Poller: data: '{data}'")
 

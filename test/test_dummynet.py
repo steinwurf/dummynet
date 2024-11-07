@@ -9,6 +9,9 @@ import time
 import pytest
 import os
 
+import dummynet.process_monitor
+
+
 log = logging.getLogger("dummynet")
 log.setLevel(logging.DEBUG)
 
@@ -331,6 +334,31 @@ def test_run_stdout():
     # check timeout of function with a long message
     with pytest.raises(dummynet.TimeoutError):
         shell.run(cmd=f"sleep 10; echo '{very_long_message}'", timeout=1)
+
+
+def test_run_async_output():
+
+    process_monitor = ProcessMonitor(log=log)
+
+    shell = HostShell(log=log, sudo=False, process_monitor=process_monitor)
+
+    out1 = shell.run_async(cmd="ping -c 5 127.0.0.1")
+    out2 = shell.run_async(cmd="ping -c 3 127.0.0.1")
+
+    def stdout1(data):
+        print("stdout1: {}".format(data))
+
+    def stdout2(data):
+        print("stdout2: {}".format(data))
+
+    out1.stdout_callback = stdout1
+    out2.stdout_callback = stdout2
+
+    while process_monitor.keep_running():
+        pass
+
+    out1.match(stdout="5 packets transmitted*", stderr=None)
+    out2.match(stdout="3 packets transmitted*", stderr=None)
 
 
 # @todo re-enable this test
