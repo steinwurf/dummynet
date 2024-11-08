@@ -101,32 +101,13 @@ class ProcessMonitor:
 
             self.log.debug(f"Poller: unregister process fd {fd}")
 
-        def read_fd(self, fd):
-
-            self.log.error(f"Poller: reading from fd {fd}")
-            data = self.streams[fd].read(4096)
-            # data = os.read(fd, 4096)  # Read in chunks of 4096 bytes
-
-            self.log.error(f"Poller: read {len(data)}")
-
-            if not data:
-                return
-
-            self.log.debug(f"Poller: read {len(data)} bytes from fd {fd}")
-            self.log.debug(f"Poller: data: '{data}'")
-
-            # Call the callback
-            self.fds[fd](data)  # .decode(encoding="utf-8", errors="replace"))
-
         # def read_fd(self, fd):
-        #     data = b""
-        #     while True:
-        #         self.log.error(f"Poller: reading from fd {fd}")
-        #         chunk = os.read(fd, 4096)  # Read in chunks of 4096 bytes
-        #         self.log.error(f"Poller: read {len(chunk)}")
-        #         if not chunk:
-        #             break
-        #         data += chunk
+
+        #     self.log.error(f"Poller: reading from fd {fd}")
+        #     print(dir(self.streams[fd]))
+        #     data = os.read(fd, 4096)  # Read in chunks of 4096 bytes
+
+        #     self.log.error(f"Poller: read {len(data)}")
 
         #     if not data:
         #         return
@@ -136,6 +117,25 @@ class ProcessMonitor:
 
         #     # Call the callback
         #     self.fds[fd](data.decode(encoding="utf-8", errors="replace"))
+
+        def read_fd(self, fd):
+            data = b""
+            while True:
+                self.log.error(f"Poller: reading from fd {fd}")
+                chunk = os.read(fd, 4096)  # Read in chunks of 4096 bytes
+                self.log.error(f"Poller: read {len(chunk)}")
+                data += chunk
+                if not chunk or len(chunk) != 4096:
+                    break
+
+            if not data:
+                return
+
+            self.log.debug(f"Poller: read {len(data)} bytes from fd {fd}")
+            self.log.debug(f"Poller: data: '{data}'")
+
+            # Call the callback
+            self.fds[fd](data.decode(encoding="utf-8", errors="replace"))
 
         def poll(self, timeout):
             fds = self.poller.poll(timeout)
@@ -225,8 +225,6 @@ class ProcessMonitor:
                 if self.info.stderr_callback:
                     self.info.stderr_callback(data)
 
-            # self.popen.stdout.reconfigure(write_through=True)
-            print(f"STDOUT: {type(self.popen.stdout)}")
             # Get the file descriptor
             poller.add_fd(
                 self.popen.stdout,

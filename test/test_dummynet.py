@@ -9,8 +9,6 @@ import time
 import pytest
 import os
 
-import dummynet.process_monitor
-
 
 log = logging.getLogger("dummynet")
 log.setLevel(logging.DEBUG)
@@ -342,17 +340,11 @@ def test_run_async_output():
 
     shell = HostShell(log=log, sudo=False, process_monitor=process_monitor)
 
-    out1 = shell.run_async(cmd="ping -c 5 127.0.0.1")
-    out2 = shell.run_async(cmd="ping -c 3 127.0.0.1")
+    out1 = shell.run_async(cmd="ping -i 0.1 -c 5 127.0.0.1")
+    out2 = shell.run_async(cmd="ping -i 0.1 -c 3 127.0.0.1")
 
-    def stdout1(data):
-        print("stdout1: {}".format(data))
-
-    def stdout2(data):
-        print("stdout2: {}".format(data))
-
-    out1.stdout_callback = stdout1
-    out2.stdout_callback = stdout2
+    out1.stdout_callback = lambda data: print("stdout1: {}".format(data))
+    out2.stdout_callback = lambda data: print("stdout2: {}".format(data))
 
     while process_monitor.keep_running():
         pass
