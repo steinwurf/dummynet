@@ -53,6 +53,8 @@ def update_sudo_password():
     cached_sudo_password = os.environ.get("DUMMYNET_SUDO_PASSWD", None)
     if cached_sudo_password:
         # Environment variable was set, use it instead of asking for a password
+        if not cached_sudo_password.endswith("\n"):
+            cached_sudo_password += "\n"
         return
 
     prompt = f"\n[sudo] password for {getpass.getuser()}: "
@@ -78,7 +80,7 @@ class ProcessMonitor:
     class Poller:
         def __init__(self, log):
             self.poller = select.poll()
-            self.fds = {}
+            self.callbacks = {}
             self.log = log
 
         def add_fd(self, fd, callback):
@@ -87,18 +89,24 @@ class ProcessMonitor:
             # register for them.
             self.poller.register(fd, select.POLLIN)
 
-            self.fds[fd] = callback
+            self.callbacks[fd] = callback
 
             self.log.debug(f"Poller: register process fd {fd}")
 
         def del_fd(self, fd):
             self.poller.unregister(fd)
-            del self.fds[fd]
+            del self.callbacks[fd]
 
             self.log.debug(f"Poller: unregister process fd {fd}")
 
         def read_fd(self, fd):
-            data = os.read(fd, 4096)
+            data = b""
+            while True:
+                chunk = os.read(fd, 4096)  # Read in chunks of 4096 bytes
+                data += chunk
+                if len(chunk) < 4096:
+                    # If we read less than 4096 bytes, we are done
+                    break
 
             if not data:
                 return
@@ -107,7 +115,7 @@ class ProcessMonitor:
             self.log.debug(f"Poller: data: '{data}'")
 
             # Call the callback
-            self.fds[fd](data.decode(encoding="utf-8", errors="replace"))
+            self.callbacks[fd](data.decode(encoding="utf-8", errors="replace"))
 
         def poll(self, timeout):
             fds = self.poller.poll(timeout)
@@ -129,8 +137,7 @@ class ProcessMonitor:
                     self.del_fd(fd=fd)
 
         def wait_fd(self, fd):
-
-            while fd in self.fds:
+            while fd in self.callbacks:
                 self.poll(timeout=0.1)
 
     class Process:
@@ -161,7 +168,10 @@ class ProcessMonitor:
             )
 
             # Pipe possible sudo password to the process
-            if sudo and (cached_sudo_password != None):
+            if sudo and (cached_sudo_password is not None):
+                assert cached_sudo_password.endswith(
+                    "\n"
+                )  # Ensure the password ends with a newline as otherwise sudo will hang
                 self.popen.stdin.write(cached_sudo_password)
                 self.popen.stdin.flush()
 
