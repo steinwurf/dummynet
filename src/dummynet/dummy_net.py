@@ -305,9 +305,9 @@ class DummyNet(object):
         name: str,
         shell,
         log: Logger,
-        default_path: str = "/sys/fs/cgroup",
-        controllers: dict = {"cpu.max": None, "memory.high": None},
-        pid=None,
+        cpu_limit=None,
+        memory_limit=None,
+        pid_list=None,
     ):
         """
         Creates a new cgroup object.
@@ -325,11 +325,12 @@ class DummyNet(object):
             name=name,
             shell=shell,
             log=log,
-            default_path=default_path,
-            controllers=controllers,
-            pid=pid,
+            cpu_limit=cpu_limit,
+            memory_limit=memory_limit,
+            pid_list=pid_list,
         )
         self.cgroups.append(cgroup)
+        self.cleaners.append(cgroup.hard_clean)
         return cgroup
 
     def cgroup_cleanup(self):
