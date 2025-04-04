@@ -307,7 +307,6 @@ class DummyNet(object):
         log: Logger,
         cpu_limit=None,
         memory_limit=None,
-        pid_list=None,
     ):
         """
         Creates a new cgroup object.
@@ -327,7 +326,6 @@ class DummyNet(object):
             log=log,
             cpu_limit=cpu_limit,
             memory_limit=memory_limit,
-            pid_list=pid_list,
         )
         self.cgroups.append(cgroup)
         self.cleaners.append(cgroup.hard_clean)
