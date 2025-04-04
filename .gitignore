@@ -6,6 +6,8 @@ coverage
 .lock*
 .pytest_cache
 venv-test
+virtualenv-*
+.venv
 test-venv
 .vscode
 **/__pycache__
