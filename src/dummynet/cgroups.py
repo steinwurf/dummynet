@@ -8,7 +8,7 @@ import psutil
 class CGroup:
     """
     A class for manipulating cgroups. This class is not meant to be used
-    directly, but through the Dummynet-instance.
+    directly, but through the ``DummyNet``-instance.
 
     :param name: The name of the cgroup.
     :param shell: The shell object used for executing shell commands.
