@@ -5,7 +5,7 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Major: Changed the API of the `CGroup`.
 
 4.0.1
 -----

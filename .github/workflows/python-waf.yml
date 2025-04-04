@@ -16,22 +16,24 @@ jobs:
     name: Waf
     runs-on:
       - self-hosted
-      - builder
-      - docker
-    container:
-      image: ghcr.io/steinwurf/python-bindings:2.0.0
-      options: --user 0:0 --privileged
-      volumes:
-        - /home/buildbot/.ssh:/root/.ssh
+      - vm
+      - ubuntu-current
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Configure
         run: python3 waf configure
       - name: Build
         run: python3 waf
       - name: Test
         run: python3 waf --run_tests
+  workflow-keepalive:
+    if: github.event_name == 'schedule'
+    runs-on: [self-hosted, vm, ubuntu-current]
+    permissions:
+      actions: write
+    steps:
+      - uses: liskin/gh-workflow-keepalive@v1
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
   cancel-in-progress: true

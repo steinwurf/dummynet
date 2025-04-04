@@ -8,7 +8,7 @@ import logging
 import time
 import pytest
 import os
-
+import psutil
 
 log = logging.getLogger("dummynet")
 log.setLevel(logging.DEBUG)
@@ -353,120 +353,157 @@ def test_run_async_output():
     out2.match(stdout="3 packets transmitted*", stderr=None)
 
 
-# @todo re-enable this test
-# @pytest.fixture
-# def sad_path():
+def test_cgroup_init_and_delete():
 
-#     # Check if we need to run as sudo
-#     sudo = os.getuid() != 0
+    sudo = os.getuid() != 0
 
-#     process_monitor = ProcessMonitor(log=log)
-#     shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-#     net = DummyNet(shell=shell)
+    process_monitor = ProcessMonitor(log=log)
+    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+    net = DummyNet(shell=shell)
 
-#     sad_cgroup = net.add_cgroup(
-#         name="test_cgroup_sad",
-#         shell=shell,
-#         log=log,
-#         default_path="/sys/fs/cgroup",
-#         controllers={"cpu.wrongname": 0, "memory.high": -200000000},
-#         pid=12345,
-#     )
-#     return sad_cgroup
+    cgroup = net.add_cgroup(
+        name="test_cgroup_happy",
+        shell=shell,
+        log=log,
+        cpu_limit=0.5,
+        memory_limit=200000000,
+    )
 
+    cgroup.add_pid(pid=os.getpid())
 
-# @pytest.fixture
-# def happy_path():
+    groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
+    assert cgroup.name in groups
 
-#     # Check if we need to run as sudo
-#     sudo = os.getuid() != 0
+    net.cleanup()
 
-#     process_monitor = ProcessMonitor(log=log)
-#     shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-#     net = DummyNet(shell=shell)
-
-#     happy_cgroup = net.add_cgroup(
-#         name="test_cgroup_happy",
-#         shell=shell,
-#         log=log,
-#         default_path="/sys/fs/cgroup",
-#         controllers={"cpu.max": 0.5, "memory.high": 200000000},
-#         pid=os.getpid(),
-#     )
-#     return happy_cgroup
-
-# def test_cgroup_build(happy_path):
-#     cgroup_build = happy_path
-
-#     cgroup_build = dummynet.CGroup.build_cgroup(cgroup_build, force=True)
-#     cgroup_build.hard_clean()
-#     assert True
+    groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
+    assert not cgroup.name in groups
 
 
-# def test_cgroup_delete(sad_path):
-#     cgroup_delete = sad_path
-#     cgroup_delete.make_cgroup(exist_ok=True)
+def test_cgroup_init_wrong_pid():
+    sudo = os.getuid() != 0
 
-#     try:
-#         cgroup_delete.delete_cgroup(not_exist_ok=False)
-#     except Exception as e:
-#         assert f"exists" in str(e)
+    process_monitor = ProcessMonitor(log=log)
+    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+    net = DummyNet(shell=shell)
 
+    with pytest.raises(AssertionError) as e:
+        cgroup = net.add_cgroup(
+            name="test_cgroup_negative_pid",
+            shell=shell,
+            log=log,
+            cpu_limit=0.5,
+            memory_limit=200000000,
+        )
 
-# def test_cgroup_make(sad_path):
-#     cgroup_make = sad_path
+        cgroup.add_pid(pid=-1)
 
-#     try:
-#         cgroup_make.make_cgroup(exist_ok=True)
-#         cgroup_make.make_cgroup(exist_ok=False)
-#     except Exception as e:
-#         assert f"exists" in str(e)
+        assert "PID must be greater than 0." in str(e)
 
+    net.cleanup()
+    groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
+    assert not "test_cgroup_negative_pid" in groups
 
-# def test_cgroup__add_cgroup_controller(sad_path):
-#     cgroup_add_controller = sad_path
+    with pytest.raises(ProcessLookupError) as e:
+        cgroup = net.add_cgroup(
+            name="test_cgroup_non_pid",
+            shell=shell,
+            log=log,
+            cpu_limit=0.5,
+            memory_limit=200000000,
+        )
+        cgroup.add_pid(pid=999999999)
 
-#     try:
-#         cgroup_add_controller._add_cgroup_controller("cpu.wrongname")
-#     except AssertionError as e:
-#         assert "Controller " in str(e)
+        assert "No such process" in str(e)
 
-
-# def test_cgroup_input_validation(sad_path):
-#     cgroup_input_validation = sad_path
-
-#     try:
-#         cgroup_input_validation.name = 12345
-#         cgroup_input_validation.input_validation()
-#     except AssertionError as e:
-#         assert "Name must be a string" in str(e)
-
-
-# def test_cgroup_set_limit(sad_path):
-#     cgroup_set_limit = sad_path
-
-#     try:
-#         cgroup_set_limit.set_limit(cgroup_set_limit.controllers)
-#     except AssertionError as e:
-#         assert "must be in range" in str(
-#             e
-#         ) or "Controller not found in cgroup directory" in str(e)
+    net.cleanup()
+    groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
+    assert not "test_cgroup_non_pid" in groups
 
 
-# def test_cgroup_add_pid(sad_path):
-#     cgroup_add_pid = sad_path
+def test_cgroup_wrong_cpu_limit():
+    sudo = os.getuid() != 0
 
-#     try:
-#         cgroup_add_pid.add_pid(cgroup_add_pid.pid)
-#     except AssertionError as e:
-#         assert f"Process {cgroup_add_pid.pid} is not running." in str(e)
+    process_monitor = ProcessMonitor(log=log)
+    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+    net = DummyNet(shell=shell)
+
+    with pytest.raises(AssertionError) as e:
+        cgroup = net.add_cgroup(
+            name="test_cgroup_wrong_cpu_limit",
+            shell=shell,
+            log=log,
+            cpu_limit=2,
+        )
+
+        cgroup.add_pid(pid=os.getpid())
+
+        assert "CPU limit must be in range (0, 1]." in str(e)
+
+    groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
+    assert not "test_cgroup_wrong_cpu_limit" in groups
+
+    with pytest.raises(AssertionError) as e:
+        cgroup = net.add_cgroup(
+            name="test_cgroup_wrong_cpu_limit",
+            shell=shell,
+            log=log,
+            cpu_limit=0,
+        )
+        cgroup.add_pid(pid=os.getpid())
+
+        assert "CPU limit must be in range (0, 1]." in str(e)
+
+    groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
+    assert not "test_cgroup_wrong_cpu_limit" in groups
+
+    with pytest.raises(AssertionError) as e:
+        cgroup = net.add_cgroup(
+            name="test_cgroup_wrong_cpu_limit",
+            shell=shell,
+            log=log,
+            cpu_limit=-1,
+        )
+        cgroup.add_pid(pid=os.getpid())
+        assert "CPU limit must be in range (0, 1]." in str(e)
+
+    groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
+    assert not "test_cgroup_wrong_cpu_limit" in groups
 
 
-# def test_cgroup_hard_clean(sad_path):
-#     cgroup_cleanup = sad_path
-#     cgroup_cleanup.pid = os.getpid()
-#     cgroup_cleanup.add_pid(cgroup_cleanup.pid)
-#     try:
-#         cgroup_cleanup.hard_clean()
-#     except dummynet.errors.RunInfoError as e:
-#         assert "No such file or directory" in str(e)
+def test_cgroup_wrong_memory_limit():
+    sudo = os.getuid() != 0
+
+    process_monitor = ProcessMonitor(log=log)
+    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+    net = DummyNet(shell=shell)
+
+    with pytest.raises(AssertionError) as e:
+        cgroup = net.add_cgroup(
+            name="test_cgroup_wrong_memory_limit",
+            shell=shell,
+            log=log,
+            cpu_limit=0.5,
+            memory_limit=-1,
+        )
+
+        cgroup.add_pid(pid=os.getpid())
+
+        assert "Memory limit must be in range [0, max]." in str(e)
+
+    groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
+    assert not "test_cgroup_wrong_memory_limit" in groups
+
+    with pytest.raises(AssertionError) as e:
+        cgroup = net.add_cgroup(
+            name="test_cgroup_wrong_memory_limit",
+            shell=shell,
+            log=log,
+            cpu_limit=0.5,
+            memory_limit=psutil.virtual_memory().total + 1,
+        )
+        cgroup.add_pid(pid=os.getpid())
+        assert "Memory limit must be in range [0, max]." in str(e)
+
+    groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
+    assert not "test_cgroup_wrong_memory_limit" in groups
