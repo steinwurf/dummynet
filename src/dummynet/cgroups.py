@@ -16,19 +16,7 @@ class CGroup:
     :param cpu_limit: The ratio of CPU usage limit for the cgroup. Between 0 and 1. Defaults to None.
     :param memory_limit: The memory usage hard-limit for the cgroup. In bytes. Defaults to None.
            if memory usage exceeds the limit, the processes will get killed by the kernel. OOM.
-    :param pid_list: The list of process IDs to add to the cgroup. Defaults to None.
 
-    Example:
-        >>> test_cgroup = dummynet.CGroup(
-        name="test_cgroup",
-        shell=shell,
-        log=log,
-        cpu_limit=0.5,
-        memory_limit=1024 * 1024 * 1024,
-        pid=[1234, 5678],
-        )
-        >>> test_cgroup = dummynet.CGroup.build_cgroup(test_cgroup, force=True)
-        >>> test_cgroup.hard_clean()
     """
 
     def __init__(
