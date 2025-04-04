@@ -398,12 +398,13 @@ def test_cgroup_init_wrong_pid():
 
         cgroup.add_pid(pid=-1)
 
-        assert "PID must be greater than 0" in str(e)
+        assert "PID must be greater than 0." in str(e)
 
+    net.cleanup()
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
     assert not "test_cgroup_negative_pid" in groups
 
-    with pytest.raises(OSError) as e:
+    with pytest.raises(ProcessLookupError) as e:
         cgroup = net.add_cgroup(
             name="test_cgroup_non_pid",
             shell=shell,
@@ -411,9 +412,11 @@ def test_cgroup_init_wrong_pid():
             cpu_limit=0.5,
             memory_limit=200000000,
         )
-        cgroup.add_pid(pid=os.getpid())
-        assert "PID not found" in str(e)
+        cgroup.add_pid(pid=999999999)
 
+        assert "No such process" in str(e)
+
+    net.cleanup()
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
     assert not "test_cgroup_non_pid" in groups
 

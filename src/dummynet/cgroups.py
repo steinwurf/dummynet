@@ -156,6 +156,9 @@ class CGroup:
         """
         # Check if pid exists
 
+        assert isinstance(pid, int), "PID must be an integer."
+        assert pid > 0, "PID must be greater than 0."
+
         try:
             os.kill(pid, 0)
         except OSError as e:
