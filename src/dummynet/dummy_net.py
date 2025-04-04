@@ -314,9 +314,9 @@ class DummyNet(object):
         :param name: The name of the cgroup.
         :param shell: The shell object used for executing shell commands.
         :param log: The log object used for logging messages.
-        :param default_path: The default path for cgroups. Defaults to "/sys/fs/cgroup".
-        :param controllers: Dictionary of controllers as keys and limits as values. Defaults to {"cpu.max": None, "memory.high": None}.
-        :param pid: The process ID to add to the cgroup. Defaults to None.
+        :param cpu_limit: The ratio of CPU usage limit for the cgroup. Between 0 and 1. Defaults to None.
+        :param memory_limit: The memory usage hard-limit for the cgroup. In bytes. Defaults to None.
+               if memory usage exceeds the limit, the processes will get killed by the kernel. OOM.
 
         :return: A CGroup object.
         """
