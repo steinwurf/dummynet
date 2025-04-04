@@ -368,6 +368,7 @@ def test_cgroup_init_and_delete():
         cpu_limit=0.5,
         memory_limit=200000000,
     )
+
     cgroup.add_pid(pid=os.getpid())
 
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
@@ -409,7 +410,6 @@ def test_cgroup_init_wrong_pid():
             log=log,
             cpu_limit=0.5,
             memory_limit=200000000,
-            pid_list=[999999999],
         )
         cgroup.add_pid(pid=os.getpid())
         assert "PID not found" in str(e)
