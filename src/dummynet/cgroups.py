@@ -38,7 +38,6 @@ class CGroup:
         log,
         cpu_limit=None,
         memory_limit=None,
-        pid_list=None,
     ) -> None:
 
         assert isinstance(name, str), "Name must be a string."
@@ -49,17 +48,13 @@ class CGroup:
             assert (
                 psutil.virtual_memory().total > memory_limit and memory_limit > 0
             ), "Memory limit must be in range [0, max]."
-        assert isinstance(pid_list, (list, type(None))), "PID must be a list or None."
         self.name = name
         self.shell = shell
         self.log = log
         self.cpu_limit = cpu_limit
         self.memory_limit = memory_limit
-        if pid_list:
-            self.pid_list = pid_list
-        else:
-            self.pid_list = []
         self.default_path = "/sys/fs/cgroup"
+        self.pid_list = []
         self.cgroup_path = os.path.join(self.default_path, self.name)
 
         self.make_cgroup(exist_ok=False)

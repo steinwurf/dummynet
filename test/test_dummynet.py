@@ -367,8 +367,8 @@ def test_cgroup_init_and_delete():
         log=log,
         cpu_limit=0.5,
         memory_limit=200000000,
-        pid_list=[os.getpid()],
     )
+    cgroup.add_pid(pid=os.getpid())
 
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
     assert cgroup.name in groups
@@ -393,8 +393,9 @@ def test_cgroup_init_wrong_pid():
             log=log,
             cpu_limit=0.5,
             memory_limit=200000000,
-            pid_list=[-1],
         )
+
+        cgroup.add_pid(pid=-1)
 
         assert "PID must be greater than 0" in str(e)
 
@@ -410,6 +411,7 @@ def test_cgroup_init_wrong_pid():
             memory_limit=200000000,
             pid_list=[999999999],
         )
+        cgroup.add_pid(pid=os.getpid())
         assert "PID not found" in str(e)
 
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
@@ -429,8 +431,9 @@ def test_cgroup_wrong_cpu_limit():
             shell=shell,
             log=log,
             cpu_limit=2,
-            pid_list=[os.getpid()],
         )
+
+        cgroup.add_pid(pid=os.getpid())
 
         assert "CPU limit must be in range (0, 1]." in str(e)
 
@@ -443,8 +446,8 @@ def test_cgroup_wrong_cpu_limit():
             shell=shell,
             log=log,
             cpu_limit=0,
-            pid_list=[os.getpid()],
         )
+        cgroup.add_pid(pid=os.getpid())
 
         assert "CPU limit must be in range (0, 1]." in str(e)
 
@@ -457,8 +460,8 @@ def test_cgroup_wrong_cpu_limit():
             shell=shell,
             log=log,
             cpu_limit=-1,
-            pid_list=[os.getpid()],
         )
+        cgroup.add_pid(pid=os.getpid())
         assert "CPU limit must be in range (0, 1]." in str(e)
 
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
@@ -479,8 +482,9 @@ def test_cgroup_wrong_memory_limit():
             log=log,
             cpu_limit=0.5,
             memory_limit=-1,
-            pid_list=[os.getpid()],
         )
+
+        cgroup.add_pid(pid=os.getpid())
 
         assert "Memory limit must be in range [0, max]." in str(e)
 
@@ -494,8 +498,8 @@ def test_cgroup_wrong_memory_limit():
             log=log,
             cpu_limit=0.5,
             memory_limit=psutil.virtual_memory().total + 1,
-            pid_list=[os.getpid()],
         )
+        cgroup.add_pid(pid=os.getpid())
         assert "Memory limit must be in range [0, max]." in str(e)
 
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
