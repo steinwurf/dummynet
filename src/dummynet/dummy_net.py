@@ -73,7 +73,7 @@ class DummyNet(object):
 
         names = []
 
-        for line in output.splitlines():
+        for line in output.stdout.splitlines():
             # The name is the first word followed by a space
             result = parser.match(line)
 

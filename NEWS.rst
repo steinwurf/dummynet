@@ -5,7 +5,8 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Patch: Resolved an issue in `DummyNet.link_list` where it previously caused a
+  crash. The method now correctly returns a list of links as intended.
 
 5.0.0
 -----
