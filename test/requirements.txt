@@ -9,7 +9,7 @@ backports-tarfile==1.2.0
     # via jaraco-context
 certifi==2024.6.2
     # via requests
-cffi==1.16.0
+cffi==1.17.1
     # via cryptography
 charset-normalizer==3.3.2
     # via requests

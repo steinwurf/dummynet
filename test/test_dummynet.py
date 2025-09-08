@@ -1,11 +1,14 @@
 from dummynet import DummyNet
 from dummynet import HostShell
 from dummynet import ProcessMonitor
+from dummynet import ScopedName
+from dummynet import InterfaceName
 
 import dummynet
 
 import logging
 import time
+from dummynet.scopedname import CGroupName, NamespaceName
 import pytest
 import os
 import psutil
@@ -15,7 +18,6 @@ log.setLevel(logging.DEBUG)
 
 
 def test_run():
-
     # Check if we need to run as sudo
     sudo = os.getuid() != 0
 
@@ -39,49 +41,49 @@ def test_run():
         assert namespaces == []
 
         # create two namespaces
-        demo0 = net.netns_add(name="demo0")
-        demo1 = net.netns_add(name="demo1")
-        demo2 = net.netns_add(name="demo2")
+        demo0_name, demo0 = net.netns_add("demo0")
+        demo1_name, demo1 = net.netns_add("demo1")
+        demo2_name, demo2 = net.netns_add("demo2")
 
         # Get a list of the current namespaces
         namespaces = net.netns_list()
 
-        assert namespaces == sorted(["demo2", "demo1", "demo0"])
+        assert namespaces == sorted([demo0_name, demo1_name, demo2_name])
 
         # Add a bridge in demo1
-        demo1.bridge_add(name="br0")
+        br0 = demo1.bridge_add("br0")
 
-        net.link_veth_add(p1_name="demo0-eth0", p2_name="demo1-eth0")
-        net.link_veth_add(p1_name="demo1-eth1", p2_name="demo2-eth0")
+        demo0_0, demo1_0 = net.link_veth_add("demo0_0", "demo1_0")
+        demo1_1, demo2_0 = net.link_veth_add("demo1_1", "demo2_0")
 
         # Move the interfaces to the namespaces
-        net.link_set(namespace="demo0", interface="demo0-eth0")
-        net.link_set(namespace="demo1", interface="demo1-eth0")
-        net.link_set(namespace="demo1", interface="demo1-eth1")
-        net.link_set(namespace="demo2", interface="demo2-eth0")
+        net.link_set(namespace=demo0_name, interface=demo0_0)
+        net.link_set(namespace=demo1_name, interface=demo1_0)
+        net.link_set(namespace=demo1_name, interface=demo1_1)
+        net.link_set(namespace=demo2_name, interface=demo2_0)
 
-        demo1.bridge_set(name="br0", interface="demo1-eth0")
-        demo1.bridge_set(name="br0", interface="demo1-eth1")
+        demo1.bridge_set(br0, interface=demo1_0)
+        demo1.bridge_set(br0, interface=demo1_1)
 
         # Bind an IP-address to the two peers in the link.
-        demo0.addr_add(ip="10.0.0.1/24", interface="demo0-eth0")
-        demo2.addr_add(ip="10.0.0.2/24", interface="demo2-eth0")
+        demo0.addr_add(ip="10.0.0.1/24", interface=demo0_0)
+        demo2.addr_add(ip="10.0.0.2/24", interface=demo2_0)
 
         # Activate the interfaces.
-        demo0.up(interface="demo0-eth0")
-        demo1.up(interface="br0")
-        demo1.up(interface="demo1-eth0")
-        demo1.up(interface="demo1-eth1")
-        demo2.up(interface="demo2-eth0")
+        demo0.up(demo0_0)
+        demo1.up(br0)
+        demo1.up(demo1_0)
+        demo1.up(demo1_1)
+        demo2.up(demo2_0)
 
         # We will add 20 ms of delay, 1% packet loss, a queue limit of 100 packets
         # and 10 Mbit/s of bandwidth max.
-        demo1.tc(interface="demo1-eth0", delay=20, loss=1, limit=100, rate=10)
-        demo1.tc(interface="demo1-eth1", delay=20, loss=1, limit=100, rate=10)
+        demo1.tc(demo1_0, delay=20, loss=1, limit=100, rate=10)
+        demo1.tc(demo1_1, delay=20, loss=1, limit=100, rate=10)
 
         # Show the tc-configuration of the interfaces.
-        demo1.tc_show(interface="demo1-eth0")
-        demo1.tc_show(interface="demo1-eth0")
+        demo1.tc_show(demo1_0)
+        demo1.tc_show(demo1_0)
 
         out = demo0.run(cmd="ping -c 10 10.0.0.2")
         out.match(stdout="10 packets transmitted*", stderr=None)
@@ -92,7 +94,6 @@ def test_run():
 
 
 def test_run_async():
-
     # Check if we need to run as sudo
     sudo = os.getuid() != 0
 
@@ -108,24 +109,24 @@ def test_run_async():
         assert namespaces == []
 
         # create two namespaces
-        demo0 = net.netns_add(name="demo0")
-        demo1 = net.netns_add(name="demo1")
+        demo0_name, demo0 = net.netns_add("demo0")
+        demo1_name, demo1 = net.netns_add("demo1")
 
-        net.link_veth_add(p1_name="demo0-eth0", p2_name="demo1-eth0")
+        demo0_0, demo1_0 = net.link_veth_add("demo0-0", "demo1-0")
 
         # Move the interfaces to the namespaces
-        net.link_set(namespace="demo0", interface="demo0-eth0")
-        net.link_set(namespace="demo1", interface="demo1-eth0")
+        net.link_set(namespace=demo0_name, interface=demo0_0)
+        net.link_set(namespace=demo1_name, interface=demo1_0)
 
         # Bind an IP-address to the two peers in the link.
-        demo0.addr_add(ip="10.0.0.1/24", interface="demo0-eth0")
-        demo1.addr_add(ip="10.0.0.2/24", interface="demo1-eth0")
+        demo0.addr_add(ip="10.0.0.1/24", interface=demo0_0)
+        demo1.addr_add(ip="10.0.0.2/24", interface=demo1_0)
 
         # Activate the interfaces.
-        demo0.up(interface="demo0-eth0")
-        demo1.up(interface="demo1-eth0")
-        demo0.up(interface="lo")
-        demo1.up(interface="lo")
+        demo0.up(demo0_0)
+        demo1.up(demo1_0)
+        demo0.up(InterfaceName("lo"))
+        demo1.up(InterfaceName("lo"))
 
         proc0 = demo0.run_async(cmd="ping -c 10 10.0.0.2")
         proc1 = demo1.run_async(cmd="ping -c 10 10.0.0.1")
@@ -151,7 +152,6 @@ def test_run_async():
 
 
 def test_with_timeout():
-
     # Check if we need to run as sudo
     sudo = os.getuid() != 0
 
@@ -185,7 +185,6 @@ def test_with_timeout():
 
 
 def test_daemon_exit():
-
     # Check if we need to run as sudo
     sudo = os.getuid() != 0
 
@@ -208,7 +207,6 @@ def test_daemon_exit():
 
 
 def test_all_daemons():
-
     # Check if we need to run as sudo
     sudo = os.getuid() != 0
 
@@ -228,7 +226,6 @@ def test_all_daemons():
 
 
 def test_no_processes():
-
     # Create a process monitor
     process_monitor = ProcessMonitor(log=log)
 
@@ -238,7 +235,6 @@ def test_no_processes():
 
 
 def test_hostshell_timeout():
-
     # Create a process monitor
     process_monitor = ProcessMonitor(log=log)
 
@@ -292,7 +288,6 @@ def _hostshell_timeout_daemon():
 
 
 def test_hostshell_timeout_daemon():
-
     # Check that we get a timeout if we run a command that takes too long
 
     with pytest.raises(ExceptionGroup) as e:
@@ -303,7 +298,6 @@ def test_hostshell_timeout_daemon():
 
 
 def test_run_stdout():
-
     # Create a process monitor
     process_monitor = ProcessMonitor(log=log)
 
@@ -335,7 +329,6 @@ def test_run_stdout():
 
 
 def test_run_async_output():
-
     process_monitor = ProcessMonitor(log=log)
 
     shell = HostShell(log=log, sudo=False, process_monitor=process_monitor)
@@ -354,7 +347,6 @@ def test_run_async_output():
 
 
 def test_cgroup_init_and_delete():
-
     sudo = os.getuid() != 0
 
     process_monitor = ProcessMonitor(log=log)
@@ -362,7 +354,7 @@ def test_cgroup_init_and_delete():
     net = DummyNet(shell=shell)
 
     cgroup = net.add_cgroup(
-        name="test_cgroup_happy",
+        name="test_cgr",
         shell=shell,
         log=log,
         cpu_limit=0.5,
@@ -377,7 +369,7 @@ def test_cgroup_init_and_delete():
     net.cleanup()
 
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
-    assert not cgroup.name in groups
+    assert cgroup.name not in groups
 
 
 def test_cgroup_init_wrong_pid():
@@ -402,7 +394,7 @@ def test_cgroup_init_wrong_pid():
 
     net.cleanup()
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
-    assert not "test_cgroup_negative_pid" in groups
+    assert CGroupName("test_cgroup_negative_pid").scoped not in groups
 
     with pytest.raises(ProcessLookupError) as e:
         cgroup = net.add_cgroup(
@@ -418,7 +410,7 @@ def test_cgroup_init_wrong_pid():
 
     net.cleanup()
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
-    assert not "test_cgroup_non_pid" in groups
+    assert CGroupName("test_cgroup_non_pid").scoped not in groups
 
 
 def test_cgroup_wrong_cpu_limit():
@@ -441,7 +433,7 @@ def test_cgroup_wrong_cpu_limit():
         assert "CPU limit must be in range (0, 1]." in str(e)
 
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
-    assert not "test_cgroup_wrong_cpu_limit" in groups
+    assert CGroupName("test_cgroup_wrong_cpu_limit").scoped not in groups
 
     with pytest.raises(AssertionError) as e:
         cgroup = net.add_cgroup(
@@ -455,7 +447,7 @@ def test_cgroup_wrong_cpu_limit():
         assert "CPU limit must be in range (0, 1]." in str(e)
 
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
-    assert not "test_cgroup_wrong_cpu_limit" in groups
+    assert CGroupName("test_cgroup_wrong_cpu_limit").scoped not in groups
 
     with pytest.raises(AssertionError) as e:
         cgroup = net.add_cgroup(
@@ -468,7 +460,7 @@ def test_cgroup_wrong_cpu_limit():
         assert "CPU limit must be in range (0, 1]." in str(e)
 
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
-    assert not "test_cgroup_wrong_cpu_limit" in groups
+    assert CGroupName("test_cgroup_wrong_cpu_limit").scoped not in groups
 
 
 def test_cgroup_wrong_memory_limit():
@@ -492,7 +484,7 @@ def test_cgroup_wrong_memory_limit():
         assert "Memory limit must be in range [0, max]." in str(e)
 
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
-    assert not "test_cgroup_wrong_memory_limit" in groups
+    assert CGroupName("test_cgroup_wrong_memory_limit").scoped not in groups
 
     with pytest.raises(AssertionError) as e:
         cgroup = net.add_cgroup(
@@ -506,4 +498,4 @@ def test_cgroup_wrong_memory_limit():
         assert "Memory limit must be in range [0, max]." in str(e)
 
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
-    assert not "test_cgroup_wrong_memory_limit" in groups
+    assert CGroupName("test_cgroup_wrong_memory_limit").scoped not in groups

@@ -1,11 +1,19 @@
 import re
+import os
 from subprocess import CalledProcessError
 from . import namespace_shell
+from dummynet.scopedname import (
+    ScopedName,
+    BridgeName,
+    InterfaceName,
+    NamespaceName,
+    CGroupName,
+)
 from dummynet.cgroups import CGroup
 from logging import Logger
 
 
-class DummyNet(object):
+class DummyNet:
     """A DummyNet object is used to create a network of virtual ethernet
     devices and bind them to namespaces.
     """
@@ -16,10 +24,13 @@ class DummyNet(object):
         :param shell: The shell to use for running commands
         """
         self.shell = shell
+        self.pid = os.getpid()
         self.cgroups = []
         self.cleaners = []
 
-    def link_veth_add(self, p1_name, p2_name):
+    def link_veth_add(
+        self, p1_name: str, p2_name: str
+    ) -> tuple[InterfaceName, InterfaceName]:
         """Adds a virtual ethernet between two endpoints.
 
         Name of the link will be 'p1_name@p2_name' when you look at 'ip addr'
@@ -29,11 +40,17 @@ class DummyNet(object):
         :param p2_name: Name of the second endpoint
         """
 
+        p1 = InterfaceName(p1_name)
+        p2 = InterfaceName(p2_name)
+
         self.shell.run(
-            cmd=f"ip link add {p1_name} type veth peer name {p2_name}", cwd=None
+            cmd=f"ip link add {p1.scoped} type veth peer name {p2.scoped}",
+            cwd=None,
         )
 
-    def link_set(self, namespace, interface):
+        return p1, p2
+
+    def link_set(self, namespace: NamespaceName, interface: InterfaceName) -> None:
         """Binds a network interface (usually the veths) to a namespace.
 
         The namespace parameter is the name of the namespace as a string
@@ -42,9 +59,12 @@ class DummyNet(object):
         :param interface: The interface to bind to the namespace
         """
 
-        self.shell.run(cmd=f"ip link set {interface} netns {namespace}", cwd=None)
+        self.shell.run(
+            cmd=f"ip link set {interface.scoped} netns {namespace.scoped}",
+            cwd=None,
+        )
 
-    def link_list(self, link_type=None):
+    def link_list(self, link_type=None) -> list[InterfaceName]:
         """Returns the output of the 'ip link list' command parsed to a
         list of strings
 
@@ -54,52 +74,52 @@ class DummyNet(object):
 
         cmd = "ip link list"
 
-        if link_type != None:
+        if link_type is not None:
             cmd += f" type {link_type}"
 
         output = self.shell.run(cmd=cmd, cwd=None)
 
         parser = re.compile(
-            """
+            r"""
             \d+             # Match one or more digits
             :               # Followed by a colon
             \s              # Followed by a space
             (?P<name>[^:@]+)# Match all but : or @ (group "name")
             [:@]            # Followed by : or @
             .               # Followed by anything :)
-        """,
+            """,
             re.VERBOSE,
         )
 
-        names = []
+        names: list[InterfaceName] = []
 
         for line in output.stdout.splitlines():
             # The name is the first word followed by a space
             result = parser.match(line)
 
-            if result == None:
+            if result is None:
                 continue
 
-            names.append(result.group("name"))
+            names.append(InterfaceName.from_scoped(result.group("name")))
 
         return sorted(names)
 
-    def link_delete(self, interface):
+    def link_delete(self, interface: InterfaceName) -> None:
         """Deletes a specific network interface."""
 
-        self.shell.run(cmd=f"ip link delete {interface}", cwd=None)
+        self.shell.run(cmd=f"ip link delete {interface.scoped}", cwd=None)
 
-    def addr_add(self, ip, interface):
+    def addr_add(self, ip: str, interface: InterfaceName) -> None:
         """Adds an IP-address to a network interface."""
 
-        self.shell.run(f"ip addr add {ip} dev {interface}", cwd=None)
+        self.shell.run(f"ip addr add {ip} dev {interface.scoped}", cwd=None)
 
-    def up(self, interface):
-        """Sets the given network interface to 'up'"""
+    def up(self, device: ScopedName) -> None:
+        """Sets the given network device to 'up'"""
 
-        self.shell.run(f"ip link set dev {interface} up", cwd=None)
+        self.shell.run(f"ip link set dev {device.scoped} up", cwd=None)
 
-    def route(self, ip):
+    def route(self, ip: str) -> None:
         """Sets a new default IP-route."""
 
         self.shell.run(f"ip route add default via {ip}", cwd=None)
@@ -128,17 +148,20 @@ class DummyNet(object):
 
         return self.shell.run_async(cmd=cmd, daemon=daemon, cwd=cwd)
 
-    def tc_show(self, interface, cwd=None):
+    def tc_show(self, interface: InterfaceName, cwd=None) -> str:
         """Shows the current traffic-control configurations in the given
         interface"""
 
         try:
-            output = self.shell.run(cmd=f"tc qdisc show dev {interface}", cwd=cwd)
+            output = self.shell.run(
+                cmd=f"tc qdisc show dev {interface.scoped}", cwd=cwd
+            )
         except CalledProcessError as e:
             if e.stderr == 'exec of "tc" failed: No such file or directory\n':
                 try:
                     output = self.shell.run(
-                        cmd=f"/usr/sbin/tc qdisc show dev {interface}", cwd=cwd
+                        cmd=f"/usr/sbin/tc qdisc show dev {interface.scoped}",
+                        cwd=cwd,
                     )
 
                 except CalledProcessError:
@@ -148,7 +171,15 @@ class DummyNet(object):
 
         return output
 
-    def tc(self, interface, delay=None, loss=None, rate=None, limit=None, cwd=None):
+    def tc(
+        self,
+        interface: InterfaceName,
+        delay=None,
+        loss=None,
+        rate=None,
+        limit=None,
+        cwd=None,
+    ) -> None:
         """Modifies the given interface by adding any artificial combination of
         delay, packet loss, bandwidth constraints or queue limits"""
 
@@ -162,7 +193,7 @@ class DummyNet(object):
         else:
             action = "add"
 
-        cmd = f"tc qdisc {action} dev {interface} root netem"
+        cmd = f"tc qdisc {action} dev {interface.scoped} root netem"
         if delay:
             cmd += f" delay {delay}ms"
         if loss:
@@ -185,16 +216,18 @@ class DummyNet(object):
             else:
                 raise
 
-    def forward(self, from_interface, to_interface):
+    def forward(
+        self, from_interface: InterfaceName, to_interface: InterfaceName
+    ) -> None:
         """Forwards all traffic from one network interface to another."""
         self.shell.run(
-            f"iptables -A FORWARD -o {from_interface} -i {to_interface} -j ACCEPT",
+            f"iptables -A FORWARD -o {from_interface.scoped} -i {to_interface.scoped} -j ACCEPT",
             cwd=None,
         )
 
-    def nat(self, ip, interface):
+    def nat(self, ip: str, interface: InterfaceName) -> None:
         extra_command = ""
-        cmd = f"iptables -t nat -A POSTROUTING -s {ip} -o {interface} -j MASQUERADE"
+        cmd = f"iptables -t nat -A POSTROUTING -s {ip} -o {interface.scoped} -j MASQUERADE"
         try:
             self.shell.run(cmd=cmd, cwd=None)
         except CalledProcessError as e:
@@ -208,39 +241,42 @@ class DummyNet(object):
             else:
                 raise
 
-    def netns_list(self):
+    # TODO: Filter by process?
+    def netns_list(self) -> list[NamespaceName]:
         """Returns a list of all network namespaces. Runs 'ip netns list'"""
 
         result = self.shell.run(cmd="ip netns list", cwd=None)
-        names = []
+        names: list[NamespaceName] = []
 
         for line in result.stdout.splitlines():
             # The name is the first word followed by a space
             name = line.split(" ")[0]
-            names.append(name)
+            names.append(NamespaceName.from_scoped(name))
 
         return sorted(names)
 
-    def netns_process_list(self, name):
+    # TODO: Maybe int return type?
+    def netns_process_list(self, namespace: NamespaceName) -> list[str]:
         """Returns a list of all processes in a network namespace"""
-        result = self.shell.run(cmd=f"ip netns pids {name}", cwd=None)
+        result = self.shell.run(cmd=f"ip netns pids {namespace.scoped}", cwd=None)
         return result.stdout.splitlines()
 
-    def netns_kill_process(self, name, pid):
+    def netns_kill_process(self, namespace: NamespaceName, pid: int):
         """Kills a process in a network namespace"""
-        self.shell.run(cmd=f"ip netns exec {name} kill -9 {pid}", cwd=None)
+        self.shell.run(cmd=f"ip netns exec {namespace.scoped} kill -9 {pid}", cwd=None)
 
-    def netns_kill_all(self, name):
+    def netns_kill_all(self, namespace: NamespaceName):
         """Kills all processes running in a network namespace"""
 
-        for process in self.netns_process_list(name):
-
+        for process in self.netns_process_list(namespace=namespace):
             try:
-                self.netns_kill_process(name, process)
+                self.netns_kill_process(namespace=namespace, pid=int(process))
             except Exception:
-                self.shell.log.debug(f"Failed to kill process {process} in {name}")
+                self.shell.log.debug(
+                    f"Failed to kill process {process} in {namespace.scoped}"
+                )
 
-    def netns_delete(self, name):
+    def netns_delete(self, namespace: NamespaceName):
         """Deletes a specific network namespace.
         Note that before deleting a network namespace all processes in that
         namespace should be killed. Using e.g.::
@@ -252,9 +288,9 @@ class DummyNet(object):
         :param name: Name of the namespace to delete
         """
 
-        self.shell.run(cmd=f"ip netns delete {name}", cwd=None)
+        self.shell.run(cmd=f"ip netns delete {namespace.scoped}", cwd=None)
 
-    def netns_add(self, name):
+    def netns_add(self, name: str) -> tuple[NamespaceName, "DummyNet"]:
         """Adds a new network namespace.
 
         Returns a new DummyNet object with a NamespaceShell, a wrapper to the
@@ -263,36 +299,51 @@ class DummyNet(object):
         Configuring these namespaces with the other utility commands allows you
         to configure the networks."""
 
-        self.shell.run(cmd=f"ip netns add {name}", cwd=None)
-        shell = namespace_shell.NamespaceShell(name=name, shell=self.shell)
+        namespace = NamespaceName(name=name, pid=self.pid)
 
-        dnet = DummyNet(shell=shell)
+        self.shell.run(cmd=f"ip netns add {namespace.scoped}", cwd=None)
+
+        # TODO: This is abusing DummyNet
+        ns_shell = namespace_shell.NamespaceShell(
+            name=namespace.scoped, shell=self.shell
+        )
+        dnet = self.__class__(shell=ns_shell)
 
         # Store cleanup function to remove the created namespace
         def cleaner():
-            self.netns_kill_all(name=name)
-            self.netns_delete(name=name)
+            self.netns_kill_all(namespace)
+            self.netns_delete(namespace)
             dnet.cleanup()
 
         self.cleaners.append(cleaner)
 
-        return dnet
+        return namespace, dnet
 
-    def bridge_add(self, name):
+    def bridge_add(self, name: str) -> BridgeName:
         """Adds a bridge"""
-        self.shell.run(cmd=f"ip link add name {name} type bridge", cwd=None)
+        bridge = BridgeName(name=name, pid=self.pid)
+        self.shell.run(cmd=f"ip link add name {bridge.scoped} type bridge", cwd=None)
+        return bridge
 
-    def bridge_up(self, name):
+    # TODO: This could be done with up directly?
+    def bridge_up(self, bridge: BridgeName):
         """Brings a bridge up"""
-        self.up(interface=name)
+        self.up(bridge)
 
-    def bridge_set(self, name, interface):
+    def bridge_set(self, bridge: BridgeName, interface: InterfaceName) -> None:
         """Adds an interface to a bridge"""
-        self.shell.run(cmd=f"ip link set {interface} master {name}", cwd=None)
+        self.shell.run(
+            cmd=f"ip link set {interface.scoped} master {bridge.scoped}",
+            cwd=None,
+        )
 
-    def bridge_list(self):
+    def bridge_list(self) -> list[BridgeName]:
         """List the different bridges"""
-        return self.link_list(link_type="bridge")
+        # HACK: Is bridge an interface?
+        return [
+            BridgeName(name=interface.name, pid=interface.pid)
+            for interface in self.link_list(link_type="bridge")
+        ]
 
     def cleanup(self):
         """Cleans up all the created network namespaces and bridges"""
@@ -300,6 +351,7 @@ class DummyNet(object):
         for cleaner in self.cleaners:
             cleaner()
 
+    # TODO: Rename to cgroup_add
     def add_cgroup(
         self,
         name: str,
@@ -321,7 +373,7 @@ class DummyNet(object):
         :return: A CGroup object.
         """
         cgroup = CGroup(
-            name=name,
+            name=CGroupName(name, self.pid).scoped,
             shell=shell,
             log=log,
             cpu_limit=cpu_limit,
