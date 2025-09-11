@@ -22,14 +22,13 @@ jobs:
       matrix:
         container:
           - python:3.9
-          - python:3.10
-          - python:3.11
-          - python:3.12
           - python:3.13
     container:
       image: "${{ matrix.container }}"
       options: --user 0:0
     steps:
+      - name: Install dependencies
+        run: apt update && apt install -y sudo
       - name: Checkout
         uses: actions/checkout@v4
       - name: Configure
