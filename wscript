@@ -19,7 +19,6 @@ class UploadContext(BuildContext):
 
 
 def options(opt):
-
     gr = opt.get_option_group("Build and installation options")
 
     gr.add_option(
@@ -47,10 +46,8 @@ def options(opt):
 
 
 def build(bld):
-
     # Create a virtualenv in the source folder and build universal wheel
     with bld.create_virtualenv() as venv:
-
         venv.run(cmd="python -m pip install setuptools")
         venv.run(cmd="python -m pip install wheel")
         venv.run(cmd="python setup.py bdist_wheel --universal", cwd=bld.path)
@@ -119,7 +116,6 @@ def docs(ctx):
 
 
 def _pytest(bld):
-
     # Ensure that the requirements.txt is up to date
     bld.pip_compile(
         requirements_in="test/requirements.in", requirements_txt="test/requirements.txt"
@@ -140,7 +136,6 @@ def _pytest_dev(bld):
 
 
 def _pytest_run(ctx):
-
     venv = ctx.create_virtualenv(overwrite=True)
     venv.run("python -m pip install -r test/requirements.txt")
 
@@ -151,7 +146,9 @@ def _pytest_run(ctx):
 
     # Added our systems path to the virtualenv
     venv.env["PATH"] = os.path.pathsep.join([venv.env["PATH"], os.environ["PATH"]])
-    venv.env["DUMMYNET_SUDO_PASSWD"] = getpass("[sudo] password for root: ")
+
+    if os.getuid() != 0:
+        venv.env["DUMMYNET_SUDO_PASSWD"] = getpass("[sudo] password for root: ")
 
     # We override the pytest temp folder with the basetemp option,
     # so the test folders will be available at the specified location
