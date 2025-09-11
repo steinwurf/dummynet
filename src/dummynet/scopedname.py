@@ -43,12 +43,12 @@ class ScopedName:
         return self.scoped
 
     def __post_init__(self):
-        assert len(self.name) <= self.MAX_NAME_LEN, (
-            f"{self.__class__.__name__}: name cannot be longer than cannot be longer than {self.usable_name_len} characters"
-        )
-        assert self.pid <= self.MAX_PID, (
-            f"{self.__class__.__name__}: pid cannot be greater than {self.MAX_PID}"
-        )
+        assert (
+            len(self.name) <= self.MAX_NAME_LEN
+        ), f"{self.__class__.__name__}: name cannot be longer than cannot be longer than {self.usable_name_len} characters"
+        assert (
+            self.pid <= self.MAX_PID
+        ), f"{self.__class__.__name__}: pid cannot be greater than {self.MAX_PID}"
 
     @classmethod
     def from_scoped(cls, name: str):

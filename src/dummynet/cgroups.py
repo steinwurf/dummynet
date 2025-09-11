@@ -32,9 +32,9 @@ class CGroup:
             assert 0 < cpu_limit <= 1, "CPU limit must be in range (0, 1]."
 
         if memory_limit is not None:
-            assert psutil.virtual_memory().total > memory_limit and memory_limit > 0, (
-                "Memory limit must be in range [0, max]."
-            )
+            assert (
+                psutil.virtual_memory().total > memory_limit and memory_limit > 0
+            ), "Memory limit must be in range [0, max]."
         self.name = name
         self.shell = shell
         self.log = log
@@ -116,9 +116,9 @@ class CGroup:
         )
 
         controller_list = os.listdir(self.cgroup_path)
-        assert controller in controller_list, (
-            f"Controller not found in cgroup directory. Controller: {controller}"
-        )
+        assert (
+            controller in controller_list
+        ), f"Controller not found in cgroup directory. Controller: {controller}"
 
     def set_limit(self, controller_dict: dict):
         """
