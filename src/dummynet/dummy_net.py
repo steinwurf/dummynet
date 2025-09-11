@@ -100,7 +100,9 @@ class DummyNet:
             if result is None:
                 continue
 
-            names.append(InterfaceName.from_scoped(result.group("name")))
+            name = InterfaceName.from_scoped(result.group("name"))
+            if name.pid == self.pid:
+                names.append(name)
 
         return sorted(names)
 
