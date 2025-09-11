@@ -136,6 +136,29 @@ def _pytest_dev(bld):
 
 
 def _pytest_run(ctx):
+    # TODO: Taken from src/dummynet/process_monitor.py
+    # This needs a better strategy long term than duplicating the sudo checker.
+    def sudo_requires_password() -> bool:
+        import subprocess
+
+        try:
+            # Run 'sudo' to check if sudo requires a password
+            # '--non-interactive' ensures sudo throws if it requires a password
+            # '--reset-timestamp' ensures we ignore any possible cached credentials
+            subprocess.run(
+                ["sudo", "--non-interactive", "--reset-timestamp", "true"],
+                check=True,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return False  # No password required
+        except subprocess.CalledProcessError as e:
+            if e.returncode == 1:
+                return True  # Password required
+            else:
+                return False  # Some other error, assuming no password required
+
     venv = ctx.create_virtualenv(overwrite=True)
     venv.run("python -m pip install -r test/requirements.txt")
 
@@ -147,7 +170,7 @@ def _pytest_run(ctx):
     # Added our systems path to the virtualenv
     venv.env["PATH"] = os.path.pathsep.join([venv.env["PATH"], os.environ["PATH"]])
 
-    if os.getuid() != 0:
+    if sudo_requires_password():
         venv.env["DUMMYNET_SUDO_PASSWD"] = getpass("[sudo] password for root: ")
 
     # We override the pytest temp folder with the basetemp option,
