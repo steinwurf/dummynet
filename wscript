@@ -5,6 +5,7 @@ from waflib.Build import BuildContext
 from waflib import Logs
 import waflib
 
+from getpass import getpass
 import os
 
 top = "."
@@ -150,6 +151,7 @@ def _pytest_run(ctx):
 
     # Added our systems path to the virtualenv
     venv.env["PATH"] = os.path.pathsep.join([venv.env["PATH"], os.environ["PATH"]])
+    venv.env["DUMMYNET_SUDO_PASSWD"] = getpass("[sudo] password for root: ")
 
     # We override the pytest temp folder with the basetemp option,
     # so the test folders will be available at the specified location
@@ -167,7 +169,7 @@ def _pytest_run(ctx):
         test_filter = f"-k '{ctx.options.filter}'"
 
     # Main test command
-    venv.run(f"python -B -m pytest -xrA {test_filter} --basetemp {basetemp}")
+    venv.run(f"python -B -m pytest -xrA {test_filter} --basetemp {basetemp} -n logical")
 
     # Check the package
     venv.run(f"twine check {wheel}")

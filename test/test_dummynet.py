@@ -85,8 +85,8 @@ def test_run():
         demo1.tc_show(demo1_0)
         demo1.tc_show(demo1_0)
 
-        out = demo0.run(cmd="ping -c 10 10.0.0.2")
-        out.match(stdout="10 packets transmitted*", stderr=None)
+        out = demo0.run(cmd="ping -c 5 10.0.0.2")
+        out.match(stdout="5 packets transmitted*", stderr=None)
 
     finally:
         # Clean up.
@@ -128,8 +128,8 @@ def test_run_async():
         demo0.up(InterfaceName("lo"))
         demo1.up(InterfaceName("lo"))
 
-        proc0 = demo0.run_async(cmd="ping -c 10 10.0.0.2")
-        proc1 = demo1.run_async(cmd="ping -c 10 10.0.0.1")
+        proc0 = demo0.run_async(cmd="ping -c 5 10.0.0.2")
+        proc1 = demo1.run_async(cmd="ping -c 5 10.0.0.1")
 
         def _proc0_stdout(data):
             print("proc0: {}".format(data))
@@ -143,8 +143,8 @@ def test_run_async():
         while process_monitor.keep_running():
             pass
 
-        proc0.match(stdout="10 packets transmitted*", stderr=None)
-        proc1.match(stdout="10 packets transmitted*", stderr=None)
+        proc0.match(stdout="5 packets transmitted*", stderr=None)
+        proc1.match(stdout="5 packets transmitted*", stderr=None)
 
     finally:
         # Clean up.

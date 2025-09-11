@@ -1,6 +1,6 @@
 import re
 import os
-from subprocess import CalledProcessError
+from subprocess import CalledProcessError, CompletedProcess
 from . import namespace_shell
 from dummynet.scopedname import (
     ScopedName,
@@ -148,7 +148,7 @@ class DummyNet:
 
         return self.shell.run_async(cmd=cmd, daemon=daemon, cwd=cwd)
 
-    def tc_show(self, interface: InterfaceName, cwd=None) -> str:
+    def tc_show(self, interface: InterfaceName, cwd=None) -> CompletedProcess:
         """Shows the current traffic-control configurations in the given
         interface"""
 
@@ -250,8 +250,9 @@ class DummyNet:
 
         for line in result.stdout.splitlines():
             # The name is the first word followed by a space
-            name = line.split(" ")[0]
-            names.append(NamespaceName.from_scoped(name))
+            name = NamespaceName.from_scoped(line.split(" ")[0])
+            if name.pid == self.pid:
+                names.append(name)
 
         return sorted(names)
 

@@ -1,4 +1,5 @@
 pytest
 pytest-datarecorder
 pytest-mock
+pytest-xdist[psutil]
 twine
