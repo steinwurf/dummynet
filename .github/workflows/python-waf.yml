@@ -21,7 +21,7 @@ jobs:
     strategy:
       matrix:
         container:
-          - python:3.9
+          - python:3.11
           - python:3.13
     container:
       image: "${{ matrix.container }}"
