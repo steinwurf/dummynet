@@ -25,7 +25,11 @@ jobs:
           - python:3.13
     container:
       image: "${{ matrix.container }}"
-      options: --user 0:0
+      options: >-
+        --user 0:0
+        --cap-add=NET_ADMIN
+        --device /dev/net/tun
+        --cgroupns=host
     steps:
       - name: Install dependencies
         run: apt update && apt install -y sudo
