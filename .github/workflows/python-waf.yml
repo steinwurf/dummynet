@@ -27,12 +27,13 @@ jobs:
       image: "${{ matrix.container }}"
       options: >-
         --user 0:0
-        --cap-add=NET_ADMIN
+        --privileged
         --device /dev/net/tun
-        --cgroupns=host
+        --cgroupns host
+        --pid host
     steps:
       - name: Install dependencies
-        run: apt update && apt install -y sudo
+        run: apt update && apt install -y sudo iproute2 iputils-ping
       - name: Checkout
         uses: actions/checkout@v4
       - name: Configure
