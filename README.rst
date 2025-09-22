@@ -24,5 +24,5 @@ DummyNet is a tool for creating local test networks in Python on Linux.
 
 Find documentation for DummyNet here:
 
-https://dummynet.steinwurf.com
+https://dummynet.pages.dev/latest/
 
