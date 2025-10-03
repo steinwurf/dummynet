@@ -18,12 +18,9 @@ class UploadContext(BuildContext):
 
 
 def options(opt):
-
     gr = opt.get_option_group("Build and installation options")
 
-    gr.add_option(
-        "--run_tests", default=False, action="store_true", help="Run all unit tests"
-    )
+    gr.add_option("--run_tests", default=False, action="store_true", help="Run all unit tests")
 
     gr.add_option(
         "--filter",
@@ -46,10 +43,8 @@ def options(opt):
 
 
 def build(bld):
-
     # Create a virtualenv in the source folder and build universal wheel
     with bld.create_virtualenv() as venv:
-
         venv.run(cmd="python -m pip install setuptools")
         venv.run(cmd="python -m pip install wheel")
         venv.run(cmd="python setup.py bdist_wheel --universal", cwd=bld.path)
@@ -118,7 +113,6 @@ def docs(ctx):
 
 
 def _pytest(bld):
-
     # Ensure that the requirements.txt is up to date
     bld.pip_compile(
         requirements_in="test/requirements.in", requirements_txt="test/requirements.txt"
@@ -139,7 +133,6 @@ def _pytest_dev(bld):
 
 
 def _pytest_run(ctx):
-
     venv = ctx.create_virtualenv(overwrite=True)
     venv.run("python -m pip install -r test/requirements.txt")
 
@@ -167,7 +160,7 @@ def _pytest_run(ctx):
         test_filter = f"-k '{ctx.options.filter}'"
 
     # Main test command
-    venv.run(f"python -B -m pytest -xrA {test_filter} --basetemp {basetemp}")
+    venv.run(f"python -B -m pytest -xrA {test_filter} --basetemp {basetemp} -n logical")
 
     # Check the package
     venv.run(f"twine check {wheel}")

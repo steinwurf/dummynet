@@ -7,7 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "Dummynet"
-copyright = "2022, Steinwurf ApS"
+copyright = "2025, Steinwurf ApS"
 author = "Steinwurf ApS"
 
 # -- General configuration ---------------------------------------------------
@@ -22,6 +22,9 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosectionlabel",
 ]
+
+autodoc_typehints = "description"
+autodoc_typehints_format = "short"
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]

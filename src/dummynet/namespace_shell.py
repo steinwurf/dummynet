@@ -1,7 +1,11 @@
 class NamespaceShell:
-    def __init__(self, name, shell):
+    def __init__(self, name: str, shell):
         self.name = name
         self.shell = shell
+
+    @property
+    def log(self):
+        return self.shell.log
 
     @property
     def process_monitor(self):

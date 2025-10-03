@@ -1,7 +1,5 @@
 import os
 import io
-import re
-import sys
 
 from setuptools import setup, find_packages
 
@@ -14,6 +12,7 @@ VERSION = "5.0.1"
 
 setup(
     name="dummynet",
+    python_requires=">3.11",
     version=VERSION,
     description=("A tool for creating dummy networks using network namespaces."),
     long_description=long_description,

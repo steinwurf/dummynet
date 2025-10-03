@@ -8,6 +8,7 @@ Overview of the public API.
 
    cgroups
    dummy_net
+   scoped
    process_monitor
    process
    host_shell

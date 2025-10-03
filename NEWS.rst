@@ -5,7 +5,15 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Major: Changed `DummyNet.bridge_set` API. `name` argument renamed to `bridge`.
+* Major: Removed aliased function `DummyNet.bridge_up`, use `DummyNet.up`
+  instead.
+* Major: Refactor of most internal components to support `pytest-xdist`
+  test parallelization.
+  Interfaces, Namespaces, and CGroups now are prefixed with
+  `d-XXXX-` internally. Old string based names are still functional, but require
+  interface names to be at most 8 characters, compared to the previous 15.
+* Patch: Add enforcement of Python 3.11 or later requirement in `setup.py`.
 
 5.0.1
 -----

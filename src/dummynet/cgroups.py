@@ -27,7 +27,6 @@ class CGroup:
         cpu_limit=None,
         memory_limit=None,
     ) -> None:
-
         assert isinstance(name, str), "Name must be a string."
         if cpu_limit is not None:
             assert 0 < cpu_limit <= 1, "CPU limit must be in range (0, 1]."
@@ -140,7 +139,7 @@ class CGroup:
             if key.startswith("cpu."):
                 assert 0 < value <= 1, f"{key} must be in range (0, 1]."
                 self.shell.run(
-                    cmd=f"bash -c \"echo '{int(value*100000)} 100000' | tee {self.cgroup_path}/{key}\""
+                    cmd=f"bash -c \"echo '{int(value * 100000)} 100000' | tee {self.cgroup_path}/{key}\""
                 )
             elif key.startswith("memory."):
                 assert value > 0, f"{key} must be in range [0, max]."
