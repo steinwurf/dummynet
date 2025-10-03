@@ -30,4 +30,6 @@ class NamespaceShell:
             run
         """
 
-        return self.shell.run_async(cmd=f"ip netns exec {self.name} {cmd}", daemon=daemon, cwd=cwd)
+        return self.shell.run_async(
+            cmd=f"ip netns exec {self.name} {cmd}", daemon=daemon, cwd=cwd
+        )

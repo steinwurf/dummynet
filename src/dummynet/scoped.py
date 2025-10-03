@@ -6,7 +6,9 @@ from typing import Any, ClassVar, Self
 
 from dummynet.base58 import BASE58_ALPHABET, base58_to_int, int_to_base58
 
-SCOPED_BASE58_PATTERN: re.Pattern = re.compile(rf"^d-(?P<uid>[{BASE58_ALPHABET}]+)-(?P<name>.+)$")
+SCOPED_BASE58_PATTERN: re.Pattern = re.compile(
+    rf"^d-(?P<uid>[{BASE58_ALPHABET}]+)-(?P<name>.+)$"
+)
 
 
 @total_ordering
@@ -69,7 +71,9 @@ class Scoped:
     def parse_scoped(cls, name: str) -> dict[str, Any]:
         match = SCOPED_BASE58_PATTERN.match(name)
         if not match:
-            raise ValueError(f"{cls.__name__}: name='{name}' is not a valid scoped name!")
+            raise ValueError(
+                f"{cls.__name__}: name='{name}' is not a valid scoped name!"
+            )
         return {
             "name": match.group("name"),
             "uid": base58_to_int(match.group("uid")),

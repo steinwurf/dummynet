@@ -38,7 +38,9 @@ class DummyNet:
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.cleanup()
 
-    def link_veth_add(self, p1_name: str, p2_name: str) -> tuple[InterfaceScoped, InterfaceScoped]:
+    def link_veth_add(
+        self, p1_name: str, p2_name: str
+    ) -> tuple[InterfaceScoped, InterfaceScoped]:
         """Adds a virtual ethernet between two endpoints.
 
         Name of the link will be 'p1_name@p2_name' when you look at 'ip addr'
@@ -185,7 +187,9 @@ class DummyNet:
         interface = InterfaceScoped.from_any(interface)
 
         try:
-            output = self.shell.run(cmd=f"tc qdisc show dev {interface.scoped}", cwd=cwd)
+            output = self.shell.run(
+                cmd=f"tc qdisc show dev {interface.scoped}", cwd=cwd
+            )
         # TODO: Do not reimplement our own PATH subset.
         except CalledProcessError as e:
             if e.stderr == 'exec of "tc" failed: No such file or directory\n':
@@ -321,7 +325,9 @@ class DummyNet:
             try:
                 self.netns_kill_process(namespace=namespace, pid=int(process))
             except Exception:
-                self.shell.log.debug(f"Failed to kill process {process} in {namespace.scoped}")
+                self.shell.log.debug(
+                    f"Failed to kill process {process} in {namespace.scoped}"
+                )
 
     def netns_delete(self, namespace: NamespaceScoped | Self | str):
         """Deletes a specific network namespace.
@@ -376,7 +382,9 @@ class DummyNet:
 
         return bridge
 
-    def bridge_set(self, bridge: InterfaceScoped | str, interface: InterfaceScoped | str) -> None:
+    def bridge_set(
+        self, bridge: InterfaceScoped | str, interface: InterfaceScoped | str
+    ) -> None:
         """Adds an interface to a bridge"""
 
         interface = InterfaceScoped.from_any(interface)
