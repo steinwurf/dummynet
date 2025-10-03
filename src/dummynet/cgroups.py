@@ -32,9 +32,9 @@ class CGroup:
             assert 0 < cpu_limit <= 1, "CPU limit must be in range (0, 1]."
 
         if memory_limit is not None:
-            assert (
-                psutil.virtual_memory().total > memory_limit and memory_limit > 0
-            ), "Memory limit must be in range [0, max]."
+            assert psutil.virtual_memory().total > memory_limit and memory_limit > 0, (
+                "Memory limit must be in range [0, max]."
+            )
         self.name = name
         self.shell = shell
         self.log = log
@@ -71,9 +71,7 @@ class CGroup:
             self.shell.run(cmd=f"rmdir {self.cgroup_path}")
         except dummynet.errors.RunInfoError as e:
             if "No such file or directory" in e.info.stderr:
-                self.log.info(
-                    f"Cgroup {self.name} does not exist. Skipping deletion.\n"
-                )
+                self.log.info(f"Cgroup {self.name} does not exist. Skipping deletion.\n")
             if "Device or resource busy" in e.info.stderr:
                 raise Exception(
                     f"Cgroup {self.name} failed to delete. Stop running processes before deletion.\n"
@@ -116,9 +114,9 @@ class CGroup:
         )
 
         controller_list = os.listdir(self.cgroup_path)
-        assert (
-            controller in controller_list
-        ), f"Controller not found in cgroup directory. Controller: {controller}"
+        assert controller in controller_list, (
+            f"Controller not found in cgroup directory. Controller: {controller}"
+        )
 
     def set_limit(self, controller_dict: dict):
         """
@@ -143,9 +141,7 @@ class CGroup:
                 )
             elif key.startswith("memory."):
                 assert value > 0, f"{key} must be in range [0, max]."
-                self.shell.run(
-                    cmd=f"bash -c \"echo '{value}' | tee {self.cgroup_path}/{key}\""
-                )
+                self.shell.run(cmd=f"bash -c \"echo '{value}' | tee {self.cgroup_path}/{key}\"")
 
     def add_pid(self, pid):
         """
@@ -167,9 +163,7 @@ class CGroup:
 
         if pid not in self.pid_list:
             self.pid_list.append(pid)
-        self.shell.run(
-            cmd=f'bash -c "echo {pid} |  tee {self.cgroup_path}/cgroup.procs"'
-        )
+        self.shell.run(cmd=f'bash -c "echo {pid} |  tee {self.cgroup_path}/cgroup.procs"')
 
     def hard_clean(self):
         """
@@ -182,9 +176,7 @@ class CGroup:
                 active_pids = [int(p.strip("\\n")) for p in active_pids]
             for p in self.pid_list:
                 if p in active_pids:
-                    self.shell.run(
-                        cmd=f'bash -c "echo {p} | tee {self.default_path}/cgroup.procs"'
-                    )
+                    self.shell.run(cmd=f'bash -c "echo {p} | tee {self.default_path}/cgroup.procs"')
             self.shell.run(cmd=f'bash -c "echo 1 | tee {self.cgroup_path}/cgroup.kill"')
         self.delete_cgroup(not_exist_ok=True)
         self.log.info(f"Cleanup complete for cgroup {self.name}.")

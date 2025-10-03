@@ -4,6 +4,10 @@ class NamespaceShell:
         self.shell = shell
 
     @property
+    def log(self):
+        return self.shell.log
+
+    @property
     def process_monitor(self):
         return self.shell.process_monitor
 
@@ -26,6 +30,4 @@ class NamespaceShell:
             run
         """
 
-        return self.shell.run_async(
-            cmd=f"ip netns exec {self.name} {cmd}", daemon=daemon, cwd=cwd
-        )
+        return self.shell.run_async(cmd=f"ip netns exec {self.name} {cmd}", daemon=daemon, cwd=cwd)
