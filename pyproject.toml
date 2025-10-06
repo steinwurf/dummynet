@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dummynet"
+version = "5.0.1"
+description = "A tool for creating dummy networks using network namespaces."
+readme = "README.rst"
+requires-python = ">=3.11"
+license = "BSD-3-Clause"
+authors = [
+    {name = "Steinwurf ApS", email = "contact@steinwurf.com"}
+]
+keywords = ["dummynet", "network", "namespace"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Plugins",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "psutil==7.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/steinwurf/dummynet"
+Repository = "https://github.com/steinwurf/dummynet"
+Issues = "https://github.com/steinwurf/dummynet/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["test*"]

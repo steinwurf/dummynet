@@ -6,6 +6,7 @@ from waflib import Logs
 import waflib
 
 import os
+import re
 
 top = "."
 
@@ -20,7 +21,9 @@ class UploadContext(BuildContext):
 def options(opt):
     gr = opt.get_option_group("Build and installation options")
 
-    gr.add_option("--run_tests", default=False, action="store_true", help="Run all unit tests")
+    gr.add_option(
+        "--run_tests", default=False, action="store_true", help="Run all unit tests"
+    )
 
     gr.add_option(
         "--filter",
@@ -43,11 +46,10 @@ def options(opt):
 
 
 def build(bld):
-    # Create a virtualenv in the source folder and build universal wheel
+    # Create a virtualenv in the source folder and build wheel using pyproject.toml
     with bld.create_virtualenv() as venv:
-        venv.run(cmd="python -m pip install setuptools")
-        venv.run(cmd="python -m pip install wheel")
-        venv.run(cmd="python setup.py bdist_wheel --universal", cwd=bld.path)
+        venv.run(cmd="python -m pip install build")
+        venv.run(cmd="python -m build", cwd=bld.path)
 
     # Run the unit-tests
     if bld.options.run_tests:
@@ -67,12 +69,15 @@ def _find_wheel(ctx):
 
     wheel = ctx.path.ant_glob("dist/*-" + VERSION + "-*.whl")
 
-    if not len(wheel) == 1:
-        ctx.fatal("No wheel found (or version mismatch)")
-    else:
-        wheel = wheel[0]
-        Logs.info("Wheel %s", wheel)
-        return wheel
+    if len(wheel) > 1:
+        ctx.fatal(f"Multiple wheels found: {wheel}")
+
+    if len(wheel) == 0:
+        ctx.fatal("No wheel found")
+
+    wheel = wheel[0]
+    Logs.info("Wheel %s", wheel)
+    return wheel
 
 
 def upload(bld):
@@ -89,7 +94,13 @@ def upload(bld):
 def prepare_release(ctx):
     """Prepare a release."""
 
-    with ctx.rewrite_file(filename="setup.py") as f:
+    with ctx.rewrite_file(filename="pyproject.toml") as f:
+        pattern = r'version = "\d+\.\d+\.\d+"'
+        replacement = f'version = "{VERSION}"'
+
+        f.regex_replace(pattern=pattern, replacement=replacement)
+
+    with ctx.rewrite_file(filename="wscript") as f:
         pattern = r'VERSION = "\d+\.\d+\.\d+"'
         replacement = f'VERSION = "{VERSION}"'
 
