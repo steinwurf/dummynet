@@ -5,6 +5,10 @@ every change, see the Git log.
 
 Latest
 ------
+* tbd
+
+6.0.0
+-----
 * Major: Changed `DummyNet.bridge_set` API. `name` argument renamed to `bridge`.
 * Major: Removed aliased function `DummyNet.bridge_up`, use `DummyNet.up`
   instead.
