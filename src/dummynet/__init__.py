@@ -5,11 +5,14 @@ from .host_shell import HostShell
 from .process_monitor import ProcessMonitor
 from .process import Process
 from .cgroups import CGroup
+from .scoped import Scoped, CGroupScoped, NamespaceScoped, InterfaceScoped
 
-from .errors import DummyNetError
-from .errors import RunInfoError
-from .errors import TimeoutError
-from .errors import MatchError
-from .errors import DaemonExitError
-from .errors import AllDaemonsError
-from .errors import NoProcessesError
+from .errors import (
+    DummyNetError,
+    RunInfoError,
+    TimeoutError,
+    MatchError,
+    DaemonExitError,
+    AllDaemonsError,
+    NoProcessesError,
+)
