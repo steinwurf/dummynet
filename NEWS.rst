@@ -5,6 +5,9 @@ every change, see the Git log.
 
 Latest
 ------
+* Major: `DummyNet.link_veth_add`, `DummyNet.bridge_add`, `DummyNet.link_vlan_add`
+  now handle their own cleanup correctly in `net.cleanup()` when inside the system
+  scope.
 * Minor: Added commands `DummyNet.addr_del` and `DummyNet.link_vlan_add`.
 * Minor: Make `Scoped` classes have `str()` functionality in addition to its
   `.scoped` attribute.
