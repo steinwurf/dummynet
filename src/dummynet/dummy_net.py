@@ -472,15 +472,15 @@ class DummyNet:
             )
             cleaner_command(self)
 
-        assert not self.cleaners, (
-            f"cleanup: expected cleaners to be empty, got {self.cleaners!r}"
-        )
-        assert not self.namespaces, (
-            f"cleanup: expected namespaces to be empty, got {self.namespaces!r}"
-        )
-        assert not self.cgroups, (
-            f"cleanup: expected cgroups to be empty, got {self.cgroups!r}"
-        )
+        assert (
+            not self.cleaners
+        ), f"cleanup: expected cleaners to be empty, got {self.cleaners!r}"
+        assert (
+            not self.namespaces
+        ), f"cleanup: expected namespaces to be empty, got {self.namespaces!r}"
+        assert (
+            not self.cgroups
+        ), f"cleanup: expected cgroups to be empty, got {self.cgroups!r}"
 
     def add_cgroup(
         self,
