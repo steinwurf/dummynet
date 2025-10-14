@@ -375,6 +375,15 @@ def test_addr_del_with_ping(process_monitor: ProcessMonitor, net: DummyNet):
         net.cleanup()
 
 
+def test_cleanup_with_system_devices(net: DummyNet):
+    try:
+        net.link_veth_add("veth0", "veth1")
+        net.bridge_add("br0")
+        net.bridge_set("br0", "veth1")
+    finally:
+        net.cleanup()
+
+
 def test_with_timeout(process_monitor: ProcessMonitor, net: DummyNet):
     try:
         # Run a command on the host
