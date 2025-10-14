@@ -17,23 +17,8 @@ log = logging.getLogger("dummynet")
 log.setLevel(logging.DEBUG)
 
 
-def test_run():
-    # Check if we need to run as sudo
-    sudo = os.getuid() != 0
-
-    # Create a process monitor
-    process_monitor = ProcessMonitor(log=log)
-
-    # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-
-    # Create a mock shell which will receive the calls performed by the DummyNet
-    # shell = mockshell.MockShell()
-    # shell.open(recording="test/data/calls.json", shell=host_shell)
-
-    # DummyNet wrapper that will prevent clean up from happening in playback
-    # mode if an exception occurs
-    with DummyNet(shell=shell) as net:
+def test_run(net: DummyNet):
+    with net as net:
         # Get a list of the current namespaces
         namespaces = net.netns_list()
         assert namespaces == []
@@ -93,24 +78,7 @@ def test_run():
     assert namespaces == []
 
 
-def test_run_strings():
-    # Check if we need to run as sudo
-    sudo = os.getuid() != 0
-
-    # Create a process monitor
-    process_monitor = ProcessMonitor(log=log)
-
-    # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-
-    # Create a mock shell which will receive the calls performed by the DummyNet
-    # shell = mockshell.MockShell()
-    # shell.open(recording="test/data/calls.json", shell=host_shell)
-
-    # DummyNet wrapper that will prevent clean up from happening in playback
-    # mode if an exception occurs
-    net = DummyNet(shell=shell)
-
+def test_run_strings(net: DummyNet):
     try:
         # Get a list of the current namespaces
         namespaces = net.netns_list()
@@ -173,21 +141,8 @@ def test_run_strings():
         # Clean up.
         net.cleanup()
 
-    # Ensure cleanup happened
-    namespaces = net.netns_list()
-    assert namespaces == []
 
-
-def test_run_async():
-    # Check if we need to run as sudo
-    sudo = os.getuid() != 0
-
-    process_monitor = ProcessMonitor(log=log)
-
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-
-    net = DummyNet(shell=shell)
-
+def test_run_async(process_monitor: ProcessMonitor, net: DummyNet):
     try:
         # Get a list of the current namespaces
         namespaces = net.netns_list()
@@ -230,7 +185,6 @@ def test_run_async():
 
         proc0.match(stdout="5 packets transmitted*", stderr=None)
         proc1.match(stdout="5 packets transmitted*", stderr=None)
-
     finally:
         # Clean up.
         net.cleanup()
@@ -240,20 +194,197 @@ def test_run_async():
     assert namespaces == []
 
 
-def test_with_timeout():
-    # Check if we need to run as sudo
-    sudo = os.getuid() != 0
+def test_link_vlan_ping(process_monitor: ProcessMonitor, net: DummyNet):
+    """Test VLAN interface creation and connectivity with ping"""
+    try:
+        # Create two namespaces
+        demo0 = net.netns_add("demo0")
+        demo1 = net.netns_add("demo1")
 
-    # Create a process monitor
-    process_monitor = ProcessMonitor(log=log)
+        # Create veth pair
+        demo0_veth0, demo1_veth0 = net.link_veth_add("d0v0", "d1v0")
 
-    # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
+        # Move the interfaces to the namespaces
+        net.link_set(namespace=demo0, interface=demo0_veth0)
+        net.link_set(namespace=demo1, interface=demo1_veth0)
 
-    # DummyNet wrapper that will prevent clean up from happening in playback
-    # mode if an exception occurs
-    net = DummyNet(shell=shell)
+        # Create VLAN interfaces on both sides (VLAN ID 200)
+        demo0_vlan = demo0.link_vlan_add(demo0_veth0, vlan_id=200)
+        demo1_vlan = demo1.link_vlan_add(demo1_veth0, vlan_id=200)
 
+        # Bind IP addresses to the VLAN interfaces
+        demo0.addr_add(ip="10.0.200.1/24", interface=demo0_vlan)
+        demo1.addr_add(ip="10.0.200.2/24", interface=demo1_vlan)
+
+        # Bring up the physical interfaces
+        demo0.up(demo0_veth0)
+        demo1.up(demo1_veth0)
+
+        # Bring up the VLAN interfaces
+        demo0.up(demo0_vlan)
+        demo1.up(demo1_vlan)
+
+        # Bring up loopback interfaces
+        demo0.up("lo")
+        demo1.up("lo")
+
+        # Run ping tests
+        proc0 = demo0.run_async(cmd="ping -c 5 10.0.200.2")
+        proc1 = demo1.run_async(cmd="ping -c 5 10.0.200.1")
+
+        def _proc0_stdout(data):
+            print("demo0 (VLAN 200): {}".format(data))
+
+        def _proc1_stdout(data):
+            print("demo1 (VLAN 200): {}".format(data))
+
+        proc0.stdout_callback = _proc0_stdout
+        proc1.stdout_callback = _proc1_stdout
+
+        while process_monitor.keep_running():
+            pass
+
+        # Verify successful ping
+        proc0.match(stdout="5 packets transmitted*", stderr=None)
+        proc1.match(stdout="5 packets transmitted*", stderr=None)
+
+    finally:
+        # Clean up
+        net.cleanup()
+
+
+def test_link_vlan_isolation(process_monitor: ProcessMonitor, net: DummyNet):
+    """Test that different VLANs are isolated from each other"""
+    try:
+        # Create two namespaces
+        demo0 = net.netns_add("demo0")
+        demo1 = net.netns_add("demo1")
+
+        # Create veth pair
+        demo0_veth0, demo1_veth0 = net.link_veth_add("d0v0", "d1v0")
+
+        # Move the interfaces to the namespaces
+        net.link_set(namespace=demo0, interface=demo0_veth0)
+        net.link_set(namespace=demo1, interface=demo1_veth0)
+
+        # Create different VLAN interfaces (100 vs 200)
+        demo0_vlan = demo0.link_vlan_add(demo0_veth0, vlan_id=100)
+        demo1_vlan = demo1.link_vlan_add(demo1_veth0, vlan_id=200)
+
+        # Bind IP addresses to the VLAN interfaces
+        demo0.addr_add(ip="10.0.100.1/24", interface=demo0_vlan)
+        demo1.addr_add(ip="10.0.100.2/24", interface=demo1_vlan)
+
+        # Bring up all interfaces
+        demo0.up(demo0_veth0)
+        demo1.up(demo1_veth0)
+        demo0.up(demo0_vlan)
+        demo1.up(demo1_vlan)
+        demo0.up("lo")
+        demo1.up("lo")
+
+        # Try to ping - should fail because VLANs are different
+        proc0 = demo0.run_async(
+            cmd=r"""
+            ping -c 3 -W 1 10.0.0.2; \
+            if [ "$?" -ne 1 ]; then \
+                exit 1; \
+            fi
+            """
+        )
+
+        def _proc0_stdout(data):
+            print("demo0 (VLAN 100 -> VLAN 200): {}".format(data))
+
+        proc0.stdout_callback = _proc0_stdout
+
+        while process_monitor.keep_running():
+            pass
+
+        # Verify ping fails (0 packets received)
+        proc0.match(stdout="*0 received*", stderr=None)
+
+    finally:
+        # Clean up
+        net.cleanup()
+
+
+def test_addr_del_with_ping(process_monitor: ProcessMonitor, net: DummyNet):
+    """Test that ping fails after address deletion"""
+    try:
+        # Create two namespaces
+        demo0 = net.netns_add("demo0")
+        demo1 = net.netns_add("demo1")
+
+        # Create veth pair
+        demo0_veth0, demo1_veth0 = net.link_veth_add("d0v0", "d1v0")
+
+        # Move the interfaces to the namespaces
+        net.link_set(namespace=demo0, interface=demo0_veth0)
+        net.link_set(namespace=demo1, interface=demo1_veth0)
+
+        # Bind IP addresses
+        demo0.addr_add(ip="10.0.0.1/24", interface=demo0_veth0)
+        demo1.addr_add(ip="10.0.0.2/24", interface=demo1_veth0)
+
+        # Bring up interfaces
+        demo0.up(demo0_veth0)
+        demo1.up(demo1_veth0)
+        demo0.up("lo")
+        demo1.up("lo")
+
+        # First ping should succeed
+        proc0 = demo0.run_async(cmd="ping -c 3 10.0.0.2")
+
+        def _proc0_stdout(data):
+            print("demo0 (before addr_del): {}".format(data))
+
+        proc0.stdout_callback = _proc0_stdout
+
+        while process_monitor.keep_running():
+            pass
+
+        proc0.match(stdout="3 packets transmitted*", stderr=None)
+
+        # Now delete the address from demo1
+        demo1.addr_del(ip="10.0.0.2/24", interface=demo1_veth0)
+
+        # Second ping should fail
+        proc1 = demo0.run_async(
+            cmd=r"""
+            ping -c 3 -W 1 10.0.0.2; \
+            if [ "$?" -ne 1 ]; then \
+                exit 1; \
+            fi
+            """
+        )
+
+        def _proc1_stdout(data):
+            print("demo0 (after addr_del): {}".format(data))
+
+        proc1.stdout_callback = _proc1_stdout
+
+        while process_monitor.keep_running():
+            pass
+
+        # Verify ping fails
+        proc1.match(stdout="*0 received*", stderr=None)
+
+    finally:
+        # Clean up
+        net.cleanup()
+
+
+def test_cleanup_with_system_devices(net: DummyNet):
+    try:
+        net.link_veth_add("veth0", "veth1")
+        net.bridge_add("br0")
+        net.bridge_set("br0", "veth1")
+    finally:
+        net.cleanup()
+
+
+def test_with_timeout(process_monitor: ProcessMonitor, net: DummyNet):
     try:
         # Run a command on the host
         out = net.run(cmd="ping -c 5 127.0.0.1")
@@ -267,22 +398,12 @@ def test_with_timeout():
             if time.time() >= end_time:
                 log.debug("Test timeout")
                 process_monitor.stop()
-
     finally:
         # Clean up.
         net.cleanup()
 
 
-def test_daemon_exit():
-    # Check if we need to run as sudo
-    sudo = os.getuid() != 0
-
-    # Create a process monitor
-    process_monitor = ProcessMonitor(log=log)
-
-    # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-
+def test_daemon_exit(process_monitor: ProcessMonitor, shell: DummyNet):
     # Run two commands on the host where the daemon will exit
     # before the non-daemon command
     shell.run_async(cmd="ping -c 5 127.0.0.1", daemon=True)
@@ -295,34 +416,20 @@ def test_daemon_exit():
     assert e.group_contains(dummynet.DaemonExitError)
 
 
-def test_contextmanager_cleanup():
-    sudo = os.getuid() != 0
-    process_monitor = ProcessMonitor(log=log)
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-
-    with DummyNet(shell=shell) as net:
+def test_contextmanager_cleanup(net: DummyNet):
+    with net as net:
         assert net.netns_list() == []
 
         example = net.netns_add("example")
         assert net.netns_list() == [example.namespace]
 
     try:
-        net = DummyNet(shell=shell)
         assert net.netns_list() == []
     finally:
         net.cleanup()
 
 
-def test_all_daemons():
-    # Check if we need to run as sudo
-    sudo = os.getuid() != 0
-
-    # Create a process monitor
-    process_monitor = ProcessMonitor(log=log)
-
-    # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-
+def test_all_daemons(process_monitor: ProcessMonitor, shell: HostShell):
     # Run two commands where both are daemons
     shell.run_async(cmd="ping -c 5 8.8.8.8", daemon=True)
     shell.run_async(cmd="ping -c 50 8.8.8.8", daemon=True)
@@ -332,22 +439,13 @@ def test_all_daemons():
             pass
 
 
-def test_no_processes():
-    # Create a process monitor
-    process_monitor = ProcessMonitor(log=log)
-
+def test_no_processes(process_monitor: ProcessMonitor):
     # Nothing to do
     while process_monitor.keep_running():
         pass
 
 
-def test_hostshell_timeout():
-    # Create a process monitor
-    process_monitor = ProcessMonitor(log=log)
-
-    # The host shell
-    shell = HostShell(log=log, sudo=False, process_monitor=process_monitor)
-
+def test_hostshell_timeout(process_monitor: ProcessMonitor, shell: HostShell):
     start = time.time()
     # Check that we get a timeout if we run a command that takes too long
     with pytest.raises(dummynet.TimeoutError):
@@ -367,49 +465,33 @@ def test_hostshell_timeout():
         pass
 
 
-def _hostshell_timeout_daemon():
-    # Seperated this in to a function to look like a typical integration
-    # test
-
-    # Check if we need to run as sudo
-    sudo = os.getuid() != 0
-
-    # Create a process monitor
-    process_monitor = ProcessMonitor(log=log)
-
-    # The host shell
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-
-    # Start a deamon process (those should not exit before the test is over)
-    shell.run_async(cmd="sleep 2", daemon=True)
-
-    # Next we run a blocking command that will timeout
-    # we expect to also be notified that the daemon process exited
-    # prematurely
-
-    shell.run(cmd="sleep 10", timeout=5)
-
-    # Nothing to do
-    while process_monitor.keep_running():
-        pass
-
-
-def test_hostshell_timeout_daemon():
+def test_hostshell_timeout_daemon(process_monitor: ProcessMonitor, shell: HostShell):
     # Check that we get a timeout if we run a command that takes too long
+    def hostshell_timeout_daemon():
+        # Seperated this in to a function to look like a typical integration
+        # test
+
+        # Start a deamon process (those should not exit before the test is over)
+        shell.run_async(cmd="sleep 2", daemon=True)
+
+        # Next we run a blocking command that will timeout
+        # we expect to also be notified that the daemon process exited
+        # prematurely
+
+        shell.run(cmd="sleep 10", timeout=5)
+
+        # Nothing to do
+        while process_monitor.keep_running():
+            pass
 
     with pytest.raises(ExceptionGroup) as e:
-        _hostshell_timeout_daemon()
+        hostshell_timeout_daemon()
 
     assert e.group_contains(dummynet.TimeoutError)
     assert e.group_contains(dummynet.DaemonExitError)
 
 
-def test_run_stdout():
-    # Create a process monitor
-    process_monitor = ProcessMonitor(log=log)
-
-    # The host shell used if we don't have a recording
-    shell = HostShell(log=log, sudo=False, process_monitor=process_monitor)
+def test_run_stdout(shell: HostShell):
     message = "Hello World"
     info = shell.run(cmd=f"echo '{message}'")
 
@@ -435,11 +517,7 @@ def test_run_stdout():
         shell.run(cmd=f"sleep 10; echo '{very_long_message}'", timeout=1)
 
 
-def test_run_async_output():
-    process_monitor = ProcessMonitor(log=log)
-
-    shell = HostShell(log=log, sudo=False, process_monitor=process_monitor)
-
+def test_run_async_output(process_monitor: ProcessMonitor, shell: HostShell):
     out1 = shell.run_async(cmd="ping -i 0.1 -c 5 127.0.0.1")
     out2 = shell.run_async(cmd="ping -i 0.1 -c 3 127.0.0.1")
 
@@ -453,12 +531,7 @@ def test_run_async_output():
     out2.match(stdout="3 packets transmitted*", stderr=None)
 
 
-def test_cgroup_init_and_delete():
-    sudo = os.getuid() != 0
-
-    process_monitor = ProcessMonitor(log=log)
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-    net = DummyNet(shell=shell)
+def test_cgroup_init_and_delete(shell: HostShell, net: DummyNet):
     try:
         cgroup = net.add_cgroup(
             name="test_cgr",
@@ -478,13 +551,7 @@ def test_cgroup_init_and_delete():
     assert cgroup.name not in groups
 
 
-def test_cgroup_init_wrong_pid():
-    sudo = os.getuid() != 0
-
-    process_monitor = ProcessMonitor(log=log)
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-    net = DummyNet(shell=shell)
-
+def test_cgroup_init_wrong_pid(shell: HostShell, net: DummyNet):
     with pytest.raises(AssertionError) as e:
         cgroup = net.add_cgroup(
             name="test_cgroup_negative_pid",
@@ -519,13 +586,7 @@ def test_cgroup_init_wrong_pid():
     assert CGroupScoped(name="test_cgroup_non_pid").scoped not in groups
 
 
-def test_cgroup_wrong_cpu_limit():
-    sudo = os.getuid() != 0
-
-    process_monitor = ProcessMonitor(log=log)
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-    net = DummyNet(shell=shell)
-
+def test_cgroup_wrong_cpu_limit(shell: HostShell, net: DummyNet):
     with pytest.raises(AssertionError) as e:
         cgroup = net.add_cgroup(
             name="test_cgroup_wrong_cpu_limit",
@@ -569,13 +630,7 @@ def test_cgroup_wrong_cpu_limit():
     assert CGroupScoped(name="test_cgroup_wrong_cpu_limit").scoped not in groups
 
 
-def test_cgroup_wrong_memory_limit():
-    sudo = os.getuid() != 0
-
-    process_monitor = ProcessMonitor(log=log)
-    shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor)
-    net = DummyNet(shell=shell)
-
+def test_cgroup_wrong_memory_limit(shell: HostShell, net: DummyNet):
     with pytest.raises(AssertionError) as e:
         cgroup = net.add_cgroup(
             name="test_cgroup_wrong_memory_limit",

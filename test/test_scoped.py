@@ -41,3 +41,13 @@ def test_scoped_validators():
     run_test_for(NamespaceScoped)
     run_test_for(CGroupScoped)
     run_test_for(InterfaceScoped)
+
+
+def test_scoped_stringify():
+    veth0 = InterfaceScoped("veth0", uid=1)
+    assert "d-2-veth0" == f"{veth0}"
+    assert veth0 == InterfaceScoped.from_scoped(str(veth0))
+
+    veth1 = InterfaceScoped("veth1", uid=1234567)
+    assert "d-7Kze-veth1" == f"{veth1}"
+    assert veth1 == InterfaceScoped.from_scoped(str(veth1))

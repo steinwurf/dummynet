@@ -1,8 +1,9 @@
 import re
 from subprocess import CalledProcessError
-from typing import Self
+from typing import Callable, Self
 from logging import Logger
 
+from collections import OrderedDict
 from dataclasses import dataclass, field
 
 from dummynet.cgroups import CGroup
@@ -13,6 +14,7 @@ from dummynet.scoped import (
     CGroupScoped,
     NamespaceScoped,
     InterfaceScoped,
+    Scoped,
 )
 
 ShellType = NamespaceShell | HostShell
@@ -29,8 +31,9 @@ class DummyNet:
         # Root namespace under linux is simply called "1".
         default_factory=lambda: NamespaceScoped(name="1")
     )
-    cgroups: list = field(default_factory=list)
-    cleaners: list = field(default_factory=list)
+    cgroups: OrderedDict[CGroupScoped, CGroup] = field(default_factory=OrderedDict)
+    namespaces: OrderedDict[NamespaceScoped, Self] = field(default_factory=OrderedDict)
+    cleaners: OrderedDict[Scoped, Callable] = field(default_factory=OrderedDict)
 
     def __enter__(self):
         return self
@@ -59,7 +62,45 @@ class DummyNet:
             cwd=None,
         )
 
+        # We only need to track one part of the veth, as deleting one destroys the other.
+        # TODO: Find a cleaner solution given veth pairs, as its so easy to delete
+        # another namespace first and break this cleaner.
+        def cleaner(ctx: DummyNet):
+            ctx.shell.run(
+                cmd=f"ip link del {p1.scoped} || echo 'Already deleted, continuing...'",
+                cwd=None,
+            )
+
+        self.cleaners[p1] = cleaner
+
         return p1, p2
+
+    def link_vlan_add(
+        self, parent_interface: InterfaceScoped | str, vlan_id: int
+    ) -> InterfaceScoped:
+        """Add a VLAN subinterface to a parent interface.
+
+        :param parent_interface: The parent interface to create a vlan from
+        :param vlan_id: The numeric identifier of the vlan to add the interface to
+        """
+
+        parent_interface = InterfaceScoped.from_any(parent_interface)
+        interface = InterfaceScoped(f"{parent_interface.name}.{vlan_id}")
+
+        self.shell.run(
+            cmd=f"ip link add link {parent_interface.scoped} name {interface.scoped} type vlan id {vlan_id}",
+            cwd=None,
+        )
+
+        def cleaner(ctx: DummyNet):
+            ctx.shell.run(
+                cmd=f"ip link del {interface.scoped} || echo 'Already deleted, continuing...'",
+                cwd=None,
+            )
+
+        self.cleaners[interface] = cleaner
+
+        return interface
 
     def link_set(
         self, namespace: NamespaceScoped | Self | str, interface: InterfaceScoped | str
@@ -74,6 +115,14 @@ class DummyNet:
 
         namespace = NamespaceScoped.from_any(namespace)
         interface = InterfaceScoped.from_any(interface)
+
+        if namespace not in self.namespaces:
+            raise ValueError(f"No such namespace: {namespace!r}")
+
+        # Move cleaner script into namespace if defined.
+        if interface in self.cleaners:
+            cleaner = self.cleaners.pop(interface)
+            self.namespaces[namespace].cleaners[interface] = cleaner
 
         self.shell.run(
             cmd=f"ip link set {interface.scoped} netns {namespace.scoped}",
@@ -138,6 +187,13 @@ class DummyNet:
         interface = InterfaceScoped.from_any(interface)
 
         self.shell.run(f"ip addr add {ip} dev {interface.scoped}", cwd=None)
+
+    def addr_del(self, ip: str, interface: InterfaceScoped | str) -> None:
+        """Deletes an IP-address to a network interface."""
+
+        interface = InterfaceScoped.from_any(interface)
+
+        self.shell.run(f"ip addr del {ip} dev {interface.scoped}", cwd=None)
 
     def up(self, interface: InterfaceScoped | str) -> None:
         """Sets the given network device to 'up'"""
@@ -360,14 +416,18 @@ class DummyNet:
         # NOTE: Bad architecture, ideally we should not return a split-responsibility instance of itself
         ns_shell = NamespaceShell(name=namespace.scoped, shell=self.shell)
         dnet = self.__class__(shell=ns_shell, namespace=namespace)
+        self.namespaces[namespace] = dnet
 
         # Store cleanup function to remove the created namespace
-        def cleaner():
-            self.netns_kill_all(namespace)
-            self.netns_delete(namespace)
+        def cleaner(ctx: DummyNet):
+            # Assumption: cleaner is non-transferrable
+            assert ctx.namespace == NamespaceScoped(name="1")
+            ctx.netns_kill_all(namespace)
             dnet.cleanup()
+            ctx.netns_delete(namespace)
+            self.namespaces.pop(namespace)
 
-        self.cleaners.append(cleaner)
+        self.cleaners[namespace] = cleaner
 
         return dnet
 
@@ -376,9 +436,10 @@ class DummyNet:
         bridge = InterfaceScoped(name=name, uid=self.namespace.uid)
         self.shell.run(cmd=f"ip link add name {bridge.scoped} type bridge", cwd=None)
 
-        # def cleaner():
-        #    self.shell.run(cmd=f"ip link del {bridge.scoped}", cwd=None)
-        # self.cleaners.append(cleaner)
+        def cleaner(ctx: DummyNet):
+            ctx.shell.run(cmd=f"ip link del {bridge.scoped}", cwd=None)
+
+        self.cleaners[bridge] = cleaner
 
         return bridge
 
@@ -402,9 +463,24 @@ class DummyNet:
     def cleanup(self) -> None:
         """Cleans up all the created network namespaces and bridges"""
 
-        for cleaner in self.cleaners:
-            cleaner()
-        self.cleaners = []
+        self.shell.log.debug(f"Running cleanup with items {self.cleaners!r}")
+
+        while self.cleaners:
+            scoped, cleaner_command = self.cleaners.popitem()
+            self.shell.log.debug(
+                f"Running cleanup command for {scoped!r} in {self.namespace!r}"
+            )
+            cleaner_command(self)
+
+        assert (
+            not self.cleaners
+        ), f"cleanup: expected cleaners to be empty, got {self.cleaners!r}"
+        assert (
+            not self.namespaces
+        ), f"cleanup: expected namespaces to be empty, got {self.namespaces!r}"
+        assert (
+            not self.cgroups
+        ), f"cleanup: expected cgroups to be empty, got {self.cgroups!r}"
 
     def add_cgroup(
         self,
@@ -426,19 +502,38 @@ class DummyNet:
 
         :return: A CGroup object.
         """
+        cgroup_scoped = CGroupScoped(name=name, uid=self.namespace.uid)
         cgroup = CGroup(
-            name=CGroupScoped(name=name, uid=self.namespace.uid).scoped,
+            name=cgroup_scoped.scoped,
             shell=shell,
             log=log,
             cpu_limit=cpu_limit,
             memory_limit=memory_limit,
         )
-        self.cgroups.append(cgroup)
-        self.cleaners.append(cgroup.hard_clean)
+        self.cgroups[cgroup_scoped] = cgroup
+
+        def cleaner(_):
+            cgroup.hard_clean()
+            self.cgroups.pop(cgroup_scoped)
+
+        self.cleaners[cgroup_scoped] = cleaner
+
         return cgroup
 
-    def cgroup_cleanup(self) -> None:
-        """Cleans up all the created cgroups."""
-        for c in self.cgroups:
-            c.hard_clean()
-        self.cgroups = []
+    def cgroup_list(self) -> list[CGroupScoped]:
+        """Returns a list of all cgroups. Runs 'find /sys/fs/cgroup -maxdepth 1 -mindepth 1 -type d'"""
+
+        result = self.shell.run(
+            cmd="find /sys/fs/cgroup -maxdepth 1 -mindepth 1 -type d"
+        )
+        cgroups: list[CGroupScoped] = []
+
+        for line in result.stdout.splitlines():
+            try:
+                cgroup = CGroupScoped.from_scoped(line)
+                if cgroup.uid == self.namespace.uid:
+                    cgroups.append(cgroup)
+            except ValueError:
+                continue
+
+        return cgroups
