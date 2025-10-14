@@ -43,7 +43,7 @@ def shell(log, sudo, process_monitor) -> HostShell:
 
 
 @pytest.fixture
-def net(shell) -> Generator[DummyNet]:
+def net(shell) -> Generator[DummyNet, None, None]:
     """Create a DummyNet instance"""
     net = dummynet.DummyNet(shell=shell)
     # Ensure we are not reusing a namespace
