@@ -185,7 +185,6 @@ def test_run_async(process_monitor: ProcessMonitor, net: DummyNet):
 
         proc0.match(stdout="5 packets transmitted*", stderr=None)
         proc1.match(stdout="5 packets transmitted*", stderr=None)
-
     finally:
         # Clean up.
         net.cleanup()
@@ -193,6 +192,187 @@ def test_run_async(process_monitor: ProcessMonitor, net: DummyNet):
     # Ensure cleanup happened
     namespaces = net.netns_list()
     assert namespaces == []
+
+
+def test_link_vlan_ping(process_monitor: ProcessMonitor, net: DummyNet):
+    """Test VLAN interface creation and connectivity with ping"""
+    try:
+        # Create two namespaces
+        demo0 = net.netns_add("demo0")
+        demo1 = net.netns_add("demo1")
+
+        # Create veth pair
+        demo0_veth0, demo1_veth0 = net.link_veth_add("d0v0", "d1v0")
+
+        # Move the interfaces to the namespaces
+        net.link_set(namespace=demo0, interface=demo0_veth0)
+        net.link_set(namespace=demo1, interface=demo1_veth0)
+
+        # Create VLAN interfaces on both sides (VLAN ID 200)
+        demo0_vlan = demo0.link_vlan_add(demo0_veth0, vlan_id=200)
+        demo1_vlan = demo1.link_vlan_add(demo1_veth0, vlan_id=200)
+
+        # Bind IP addresses to the VLAN interfaces
+        demo0.addr_add(ip="10.0.200.1/24", interface=demo0_vlan)
+        demo1.addr_add(ip="10.0.200.2/24", interface=demo1_vlan)
+
+        # Bring up the physical interfaces
+        demo0.up(demo0_veth0)
+        demo1.up(demo1_veth0)
+
+        # Bring up the VLAN interfaces
+        demo0.up(demo0_vlan)
+        demo1.up(demo1_vlan)
+
+        # Bring up loopback interfaces
+        demo0.up("lo")
+        demo1.up("lo")
+
+        # Run ping tests
+        proc0 = demo0.run_async(cmd="ping -c 5 10.0.200.2")
+        proc1 = demo1.run_async(cmd="ping -c 5 10.0.200.1")
+
+        def _proc0_stdout(data):
+            print("demo0 (VLAN 200): {}".format(data))
+
+        def _proc1_stdout(data):
+            print("demo1 (VLAN 200): {}".format(data))
+
+        proc0.stdout_callback = _proc0_stdout
+        proc1.stdout_callback = _proc1_stdout
+
+        while process_monitor.keep_running():
+            pass
+
+        # Verify successful ping
+        proc0.match(stdout="5 packets transmitted*", stderr=None)
+        proc1.match(stdout="5 packets transmitted*", stderr=None)
+
+    finally:
+        # Clean up
+        net.cleanup()
+
+
+def test_link_vlan_isolation(process_monitor: ProcessMonitor, net: DummyNet):
+    """Test that different VLANs are isolated from each other"""
+    try:
+        # Create two namespaces
+        demo0 = net.netns_add("demo0")
+        demo1 = net.netns_add("demo1")
+
+        # Create veth pair
+        demo0_veth0, demo1_veth0 = net.link_veth_add("d0v0", "d1v0")
+
+        # Move the interfaces to the namespaces
+        net.link_set(namespace=demo0, interface=demo0_veth0)
+        net.link_set(namespace=demo1, interface=demo1_veth0)
+
+        # Create different VLAN interfaces (100 vs 200)
+        demo0_vlan = demo0.link_vlan_add(demo0_veth0, vlan_id=100)
+        demo1_vlan = demo1.link_vlan_add(demo1_veth0, vlan_id=200)
+
+        # Bind IP addresses to the VLAN interfaces
+        demo0.addr_add(ip="10.0.100.1/24", interface=demo0_vlan)
+        demo1.addr_add(ip="10.0.100.2/24", interface=demo1_vlan)
+
+        # Bring up all interfaces
+        demo0.up(demo0_veth0)
+        demo1.up(demo1_veth0)
+        demo0.up(demo0_vlan)
+        demo1.up(demo1_vlan)
+        demo0.up("lo")
+        demo1.up("lo")
+
+        # Try to ping - should fail because VLANs are different
+        proc0 = demo0.run_async(
+            cmd=r"""
+            ping -c 3 -W 1 10.0.0.2; \
+            if [ "$?" -ne 1 ]; then \
+                exit 1; \
+            fi
+            """
+        )
+
+        def _proc0_stdout(data):
+            print("demo0 (VLAN 100 -> VLAN 200): {}".format(data))
+
+        proc0.stdout_callback = _proc0_stdout
+
+        while process_monitor.keep_running():
+            pass
+
+        # Verify ping fails (0 packets received)
+        proc0.match(stdout="*0 received*", stderr=None)
+
+    finally:
+        # Clean up
+        net.cleanup()
+
+
+def test_addr_del_with_ping(process_monitor: ProcessMonitor, net: DummyNet):
+    """Test that ping fails after address deletion"""
+    try:
+        # Create two namespaces
+        demo0 = net.netns_add("demo0")
+        demo1 = net.netns_add("demo1")
+
+        # Create veth pair
+        demo0_veth0, demo1_veth0 = net.link_veth_add("d0v0", "d1v0")
+
+        # Move the interfaces to the namespaces
+        net.link_set(namespace=demo0, interface=demo0_veth0)
+        net.link_set(namespace=demo1, interface=demo1_veth0)
+
+        # Bind IP addresses
+        demo0.addr_add(ip="10.0.0.1/24", interface=demo0_veth0)
+        demo1.addr_add(ip="10.0.0.2/24", interface=demo1_veth0)
+
+        # Bring up interfaces
+        demo0.up(demo0_veth0)
+        demo1.up(demo1_veth0)
+        demo0.up("lo")
+        demo1.up("lo")
+
+        # First ping should succeed
+        proc0 = demo0.run_async(cmd="ping -c 3 10.0.0.2")
+
+        def _proc0_stdout(data):
+            print("demo0 (before addr_del): {}".format(data))
+
+        proc0.stdout_callback = _proc0_stdout
+
+        while process_monitor.keep_running():
+            pass
+
+        proc0.match(stdout="3 packets transmitted*", stderr=None)
+
+        # Now delete the address from demo1
+        demo1.addr_del(ip="10.0.0.2/24", interface=demo1_veth0)
+
+        # Second ping should fail
+        proc1 = demo0.run_async(
+            cmd=r"""
+            ping -c 3 -W 1 10.0.0.2; \
+            if [ "$?" -ne 1 ]; then \
+                exit 1; \
+            fi
+            """
+        )
+
+        def _proc1_stdout(data):
+            print("demo0 (after addr_del): {}".format(data))
+
+        proc1.stdout_callback = _proc1_stdout
+
+        while process_monitor.keep_running():
+            pass
+
+        # Verify ping fails
+        proc1.match(stdout="*0 received*", stderr=None)
+
+    finally:
+        # Clean up
+        net.cleanup()
 
 
 def test_with_timeout(process_monitor: ProcessMonitor, net: DummyNet):

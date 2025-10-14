@@ -71,7 +71,7 @@ class DummyNet:
         """
 
         parent_interface = InterfaceScoped.from_any(parent_interface)
-        interface = InterfaceScoped(f"{parent_interface.scoped}.{vlan_id}")
+        interface = InterfaceScoped(f"{parent_interface.name}.{vlan_id}")
 
         self.shell.run(
             cmd=f"ip link add link {parent_interface.scoped} name {interface.scoped} type vlan id {vlan_id}",
