@@ -152,6 +152,9 @@ class Scoped:
     def __hash__(self) -> int:
         return hash((self.uid, self.name))
 
+    def __str__(self) -> str:
+        return self.scoped
+
 
 class InterfaceScoped(Scoped):
     """Scoped subclass for network interfaces.

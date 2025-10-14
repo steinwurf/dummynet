@@ -61,6 +61,25 @@ class DummyNet:
 
         return p1, p2
 
+    def link_vlan_add(
+        self, parent_interface: InterfaceScoped | str, vlan_id: int
+    ) -> InterfaceScoped:
+        """Add a VLAN subinterface to a parent interface.
+
+        :param parent_interface: The parent interface to create a vlan from
+        :param vlan_id: The numeric identifier of the vlan to add the interface to
+        """
+
+        parent_interface = InterfaceScoped.from_any(parent_interface)
+        interface = InterfaceScoped(f"{parent_interface.scoped}.{vlan_id}")
+
+        self.shell.run(
+            cmd=f"ip link add link {parent_interface.scoped} name {interface.scoped} type vlan id {vlan_id}",
+            cwd=None,
+        )
+
+        return interface
+
     def link_set(
         self, namespace: NamespaceScoped | Self | str, interface: InterfaceScoped | str
     ) -> None:
@@ -138,6 +157,13 @@ class DummyNet:
         interface = InterfaceScoped.from_any(interface)
 
         self.shell.run(f"ip addr add {ip} dev {interface.scoped}", cwd=None)
+
+    def addr_del(self, ip: str, interface: InterfaceScoped | str) -> None:
+        """Deletes an IP-address to a network interface."""
+
+        interface = InterfaceScoped.from_any(interface)
+
+        self.shell.run(f"ip addr del {ip} dev {interface.scoped}", cwd=None)
 
     def up(self, interface: InterfaceScoped | str) -> None:
         """Sets the given network device to 'up'"""
