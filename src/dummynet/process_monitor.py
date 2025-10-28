@@ -35,6 +35,8 @@ def sudo_requires_password() -> bool:
             return True  # Password required
         else:
             return False  # Some other error, assuming no password required
+    except FileNotFoundError:
+        return False  # Assume if we have no sudo, we have no password to feed.
 
 
 def update_sudo_password():
@@ -188,7 +190,6 @@ class ProcessMonitor:
             )
 
             def stdout_callback(data):
-
                 if self.info.stdout is None:
                     self.info.stdout = data
                 else:
@@ -198,7 +199,6 @@ class ProcessMonitor:
                     self.info.stdout_callback(data)
 
             def stderr_callback(data):
-
                 if self.info.stderr is None:
                     self.info.stderr = data
                 else:
@@ -219,7 +219,6 @@ class ProcessMonitor:
             )
 
             if not is_async:
-
                 try:
                     self.info.returncode = self.popen.wait(timeout=self.info.timeout)
 
@@ -230,7 +229,6 @@ class ProcessMonitor:
                         raise errors.RunInfoError(info=self.info)
 
                 except subprocess.TimeoutExpired:
-
                     # The process did not exit
                     #
                     # This approach is taken from the subprocess documentation:
@@ -287,7 +285,6 @@ class ProcessMonitor:
         self.poller = ProcessMonitor.Poller(log=log)
 
     def run_process(self, cmd: str, sudo, cwd=None, env=None, timeout=None):
-
         try:
             process = ProcessMonitor.Process(
                 cmd=cmd,
@@ -302,7 +299,6 @@ class ProcessMonitor:
 
             return process.info
         except Exception as e:
-
             # Before we raise the exception we check if any other
             # errors have occoured
 
@@ -335,7 +331,6 @@ class ProcessMonitor:
             return process.info
 
         except:
-
             # Before we raise the exception we check if any other
             # errors have occoured
             self._validate_state()
@@ -393,12 +388,10 @@ class ProcessMonitor:
         self.daemons = []
 
     def _validate_state(self):
-
         # Check if any processes have died with an error
         exceptions = []
 
         for process in self.processes:
-
             if process.is_running():
                 continue
 

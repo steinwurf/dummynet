@@ -5,7 +5,7 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Patch: Correctly handle no-sudo case in `sudo_requires_password()` helper.
 
 7.0.0
 -----
