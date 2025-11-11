@@ -25,9 +25,7 @@ class RunInfo:
                             received.
     """
 
-    def __init__(
-        self, cmd, cwd, pid, stdout, stderr, returncode, is_async, is_daemon, timeout
-    ):
+    def __init__(self, cmd, cwd, pid, stdout, stderr, returncode, is_async, is_daemon, timeout):
         """Create a new object
 
         :param cmd: The command that was executed
@@ -96,16 +94,12 @@ class RunInfo:
         """
 
         if output is None:
-            raise errors.MatchError(
-                pattern=pattern, stream_name=stream_name, output=output
-            )
+            raise errors.MatchError(pattern=pattern, stream_name=stream_name, output=output)
 
         match_lines = fnmatch.filter(output.splitlines(), pattern)
 
         if len(match_lines) == 0:
-            raise errors.MatchError(
-                pattern=pattern, stream_name=stream_name, output=output
-            )
+            raise errors.MatchError(pattern=pattern, stream_name=stream_name, output=output)
 
     def __str__(self):
         """Print the RunInfo object as a string"""
