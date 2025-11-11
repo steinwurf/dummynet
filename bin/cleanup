@@ -17,5 +17,5 @@ done
 echo "Deleting all dummynet interfaces..."
 sudo ip -o link show | awk -F': ' '{print $2}' | cut -d'@' -f1 | grep '^d-' | while read iface; do
   echo "  Deleting interface: $iface"
-  sudo ip link delete dev "$iface"
+  sudo ip link delete dev "$iface" 2>/dev/null
 done
