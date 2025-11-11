@@ -1,10 +1,12 @@
 import re
 from subprocess import CalledProcessError
-from typing import Callable, Self
+from typing import Any, Callable, Self
 from logging import Logger
 
 from collections import OrderedDict
 from dataclasses import dataclass, field
+
+from pyroute2 import netns, NDB
 
 from dummynet.cgroups import CGroup
 from dummynet.namespace_shell import NamespaceShell
@@ -27,6 +29,7 @@ class DummyNet:
     """
 
     shell: ShellType
+    ndb: Any = field(default_factory=lambda: NDB())
     namespace: NamespaceScoped = field(
         # Root namespace under linux is simply called "1".
         default_factory=lambda: NamespaceScoped(name="1")
@@ -35,15 +38,21 @@ class DummyNet:
     namespaces: OrderedDict[NamespaceScoped, Self] = field(default_factory=OrderedDict)
     cleaners: OrderedDict[Scoped, Callable] = field(default_factory=OrderedDict)
 
+    @property
+    def target(self):
+        # Wrapper to handle pyroute2's custom naming of root namespace.
+        if self.namespace.scoped == "1":
+            return self.ndb.localhost
+        else:
+            return self.namespace.scoped
+
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.cleanup()
 
-    def link_veth_add(
-        self, p1_name: str, p2_name: str
-    ) -> tuple[InterfaceScoped, InterfaceScoped]:
+    def link_veth_add(self, p1_name: str, p2_name: str) -> tuple[InterfaceScoped, InterfaceScoped]:
         """Adds a virtual ethernet between two endpoints.
 
         Name of the link will be 'p1_name@p2_name' when you look at 'ip addr'
@@ -57,19 +66,13 @@ class DummyNet:
         p1 = InterfaceScoped(name=p1_name)
         p2 = InterfaceScoped(name=p2_name)
 
-        self.shell.run(
-            cmd=f"ip link add {p1.scoped} type veth peer name {p2.scoped}",
-            cwd=None,
-        )
+        self.ndb.interfaces.create(
+            ifname=f"{p1}", kind="veth", peer=f"{p2}", target=self.target
+        ).commit()
 
         # We only need to track one part of the veth, as deleting one destroys the other.
-        # TODO: Find a cleaner solution given veth pairs, as its so easy to delete
-        # another namespace first and break this cleaner.
         def cleaner(ctx: DummyNet):
-            ctx.shell.run(
-                cmd=f"ip link del {p1.scoped} || echo 'Already deleted, continuing...'",
-                cwd=None,
-            )
+            ctx.ndb.interfaces[{"target": self.target, "ifname": f"{p1}"}].remove().commit()
 
         self.cleaners[p1] = cleaner
 
@@ -87,16 +90,16 @@ class DummyNet:
         parent_interface = InterfaceScoped.from_any(parent_interface)
         interface = InterfaceScoped(f"{parent_interface.name}.{vlan_id}")
 
-        self.shell.run(
-            cmd=f"ip link add link {parent_interface.scoped} name {interface.scoped} type vlan id {vlan_id}",
-            cwd=None,
-        )
+        self.ndb.interfaces.create(
+            ifname=f"{interface}",
+            kind="vlan",
+            link=f"{parent_interface}",
+            target=self.target,
+            vlan_id=vlan_id,
+        ).commit()
 
         def cleaner(ctx: DummyNet):
-            ctx.shell.run(
-                cmd=f"ip link del {interface.scoped} || echo 'Already deleted, continuing...'",
-                cwd=None,
-            )
+            ctx.ndb.interfaces[{"target": self.target, "ifname": f"{interface}"}].remove().commit()
 
         self.cleaners[interface] = cleaner
 
@@ -119,15 +122,19 @@ class DummyNet:
         if namespace not in self.namespaces:
             raise ValueError(f"No such namespace: {namespace!r}")
 
-        # Move cleaner script into namespace if defined.
-        if interface in self.cleaners:
-            cleaner = self.cleaners.pop(interface)
-            self.namespaces[namespace].cleaners[interface] = cleaner
+        self.ndb.interfaces[{"target": self.target, "ifname": f"{interface}"}].set(
+            "target", f"{namespace}"
+        ).commit()
 
-        self.shell.run(
-            cmd=f"ip link set {interface.scoped} netns {namespace.scoped}",
-            cwd=None,
-        )
+        def cleaner(ctx: DummyNet):
+            try:
+                ctx.ndb.interfaces[{"target": f"{namespace}", "ifname": f"{interface}"}].set(
+                    "target", self.target
+                ).commit()
+            except TypeError:
+                pass
+
+        self.cleaners[interface] = cleaner
 
     def link_list(self, link_type=None) -> list[InterfaceScoped]:
         """Returns the output of the 'ip link list' command parsed to a
@@ -137,36 +144,18 @@ class DummyNet:
         :return: A list of interfaces of the links
         """
 
-        cmd = "ip link list"
+        report = self.ndb.interfaces.summary()
 
         if link_type is not None:
-            cmd += f" type {link_type}"
+            report.select_records(lambda interface: interface.kind == link_type)
 
-        output = self.shell.run(cmd=cmd, cwd=None)
-
-        parser = re.compile(
-            r"""
-            \d+             # Match one or more digits
-            :               # Followed by a colon
-            \s              # Followed by a space
-            (?P<name>[^:@]+)# Match all but : or @ (group "name")
-            [:@]            # Followed by : or @
-            .               # Followed by anything :)
-            """,
-            re.VERBOSE,
-        )
+        report.select_fields("ifname")
 
         names: list[InterfaceScoped] = []
 
-        for line in output.stdout.splitlines():
-            # The name is the first word followed by a space
-            result = parser.match(line)
-
-            if result is None:
-                continue
-
+        for (ifname,) in report:
             try:
-                name = InterfaceScoped.from_scoped(result.group("name"))
+                name = InterfaceScoped.from_scoped(ifname)
                 if name.uid == self.namespace.uid:
                     names.append(name)
             except ValueError:
@@ -178,41 +167,105 @@ class DummyNet:
         """Deletes a specific network interface."""
 
         interface = InterfaceScoped.from_any(interface)
+        view = self.ndb.interfaces[{"target": self.target, "ifname": f"{interface}"}]
 
-        self.shell.run(cmd=f"ip link delete {interface.scoped}", cwd=None)
+        view.remove().commit()
+
+        # HACK: Reuse view before deletion to allow safe deletes
+        # NOTE: veth peer might break this hack?
+        # TODO: Find a way to store the cleaner(s) such that we don't need to recreate the interface.
+        def cleaner(ctx: DummyNet):
+            ctx.ndb.interfaces.create(view).commit()
+
+        self.cleaners[interface] = cleaner
 
     def addr_add(self, ip: str, interface: InterfaceScoped | str) -> None:
         """Adds an IP-address to a network interface."""
 
         interface = InterfaceScoped.from_any(interface)
+        view = self.ndb.interfaces[{"target": self.target, "ifname": f"{interface}"}]
 
-        self.shell.run(f"ip addr add {ip} dev {interface.scoped}", cwd=None)
+        view.add_ip(ip).commit()
+
+        def cleaner(ctx: DummyNet):
+            print("target", self.target, "ifname", str(interface))
+            ctx.ndb.interfaces[{"target": self.target, "ifname": f"{interface}"}].del_ip(
+                ip
+            ).commit()
+
+        self.cleaners[interface] = cleaner
 
     def addr_del(self, ip: str, interface: InterfaceScoped | str) -> None:
         """Deletes an IP-address to a network interface."""
 
         interface = InterfaceScoped.from_any(interface)
+        view = self.ndb.interfaces[{"target": self.target, "ifname": f"{interface}"}]
 
-        self.shell.run(f"ip addr del {ip} dev {interface.scoped}", cwd=None)
+        view.del_ip(ip).commit()
+
+        def cleaner(ctx: DummyNet):
+            ctx.ndb.interfaces[{"target": self.target, "ifname": f"{interface}"}].add_ip(
+                ip
+            ).commit()
+
+        self.cleaners[interface] = cleaner
 
     def up(self, interface: InterfaceScoped | str) -> None:
         """Sets the given network device to 'up'"""
 
         interface = InterfaceScoped.from_any(interface)
+        view = self.ndb.interfaces[{"target": self.target, "ifname": f"{interface}"}]
+        previous_state = view.get("state")
 
-        self.shell.run(f"ip link set dev {interface.scoped} up", cwd=None)
+        view.set("state", "up").commit()
+
+        def cleaner(ctx: DummyNet):
+            ctx.ndb.interfaces[{"target": self.target, "ifname": f"{interface}"}].set(
+                "state", previous_state
+            ).commit()
+
+        self.cleaners[interface] = cleaner
 
     def down(self, interface: InterfaceScoped | str) -> None:
         """Sets the given network device to 'down'"""
 
         interface = InterfaceScoped.from_any(interface)
+        view = self.ndb.interfaces[{"target": self.target, "ifname": f"{interface}"}]
+        previous_state = view.get("state")
 
-        self.shell.run(f"ip link set dev {interface.scoped} down", cwd=None)
+        view.set("state", "down").commit()
+
+        def cleaner(ctx: DummyNet):
+            ctx.ndb.interfaces[{"target": self.target, "ifname": f"{interface}"}].set(
+                "state", previous_state
+            ).commit()
+
+        self.cleaners[interface] = cleaner
 
     def route(self, ip: str) -> None:
         """Sets a new default IP-route."""
 
-        self.shell.run(f"ip route add default via {ip}", cwd=None)
+        # FIXME: https://github.com/svinota/pyroute2/issues/1438
+        try:
+            self.ndb.routes.create(
+                target=self.target,
+                dst="default",
+                gateway=ip,
+            )
+        except TypeError:
+            # Hangs and throws, but interface does get created. Continue for now.
+            pass
+
+        # self.shell.run(f"ip route add default via {ip}", cwd=None)
+
+        def cleaner(ctx: DummyNet):
+            # FIXME: This is needlessly slow in implementation?
+            ctx.ndb.routes[
+                {"target": self.target, "dst": "default", "gateway": ip}
+            ].remove().commit()
+
+        # FIXME: No current cleaner target for routes.
+        # self.cleaners[interface] = cleaner
 
     def run(self, cmd: str, cwd=None) -> RunInfo:
         """Wrapper for the command-line access
@@ -243,9 +296,7 @@ class DummyNet:
         interface = InterfaceScoped.from_any(interface)
 
         try:
-            output = self.shell.run(
-                cmd=f"tc qdisc show dev {interface.scoped}", cwd=cwd
-            )
+            output = self.shell.run(cmd=f"tc qdisc show dev {interface.scoped}", cwd=cwd)
         # TODO: Do not reimplement our own PATH subset.
         except CalledProcessError as e:
             if e.stderr == 'exec of "tc" failed: No such file or directory\n':
@@ -381,9 +432,7 @@ class DummyNet:
             try:
                 self.netns_kill_process(namespace=namespace, pid=int(process))
             except Exception:
-                self.shell.log.debug(
-                    f"Failed to kill process {process} in {namespace.scoped}"
-                )
+                self.shell.log.debug(f"Failed to kill process {process} in {namespace.scoped}")
 
     def netns_delete(self, namespace: NamespaceScoped | Self | str):
         """Deletes a specific network namespace.
@@ -398,7 +447,9 @@ class DummyNet:
         """
         namespace = NamespaceScoped.from_any(namespace)
 
-        self.shell.run(cmd=f"ip netns delete {namespace.scoped}", cwd=None)
+        if self.target != self.ndb.localhost:
+            self.ndb.sources.remove(f"{namespace}")
+            netns.remove(f"{namespace}")
 
     def netns_add(self, name: str) -> Self:
         """Adds a new network namespace.
@@ -411,18 +462,19 @@ class DummyNet:
 
         namespace = NamespaceScoped(name=name, uid=self.namespace.uid)
 
-        self.shell.run(cmd=f"ip netns add {namespace.scoped}", cwd=None)
+        netns.create(f"{namespace}")
+        self.ndb.sources.add(netns=f"{namespace}")
 
         # NOTE: Bad architecture, ideally we should not return a split-responsibility instance of itself
         ns_shell = NamespaceShell(name=namespace.scoped, shell=self.shell)
-        dnet = self.__class__(shell=ns_shell, namespace=namespace)
+        dnet = self.__class__(shell=ns_shell, ndb=self.ndb, namespace=namespace)
         self.namespaces[namespace] = dnet
 
         # Store cleanup function to remove the created namespace
         def cleaner(ctx: DummyNet):
             # Assumption: cleaner is non-transferrable
             assert ctx.namespace == NamespaceScoped(name="1")
-            ctx.netns_kill_all(namespace)
+            # ctx.netns_kill_all(namespace)
             dnet.cleanup()
             ctx.netns_delete(namespace)
             self.namespaces.pop(namespace)
@@ -443,15 +495,14 @@ class DummyNet:
 
         return bridge
 
-    def bridge_set(
-        self, bridge: InterfaceScoped | str, interface: InterfaceScoped | str
-    ) -> None:
+    def bridge_set(self, bridge: InterfaceScoped | str, interface: InterfaceScoped | str) -> None:
         """Adds an interface to a bridge"""
 
         interface = InterfaceScoped.from_any(interface)
         bridge = InterfaceScoped.from_any(bridge)
 
         self.shell.run(
+            # How does this target the main interface?
             cmd=f"ip link set {interface.scoped} master {bridge.scoped}",
             cwd=None,
         )
@@ -467,20 +518,14 @@ class DummyNet:
 
         while self.cleaners:
             scoped, cleaner_command = self.cleaners.popitem()
-            self.shell.log.debug(
-                f"Running cleanup command for {scoped!r} in {self.namespace!r}"
-            )
+            self.shell.log.debug(f"Running cleanup command for {scoped!r} in {self.namespace!r}")
             cleaner_command(self)
 
-        assert (
-            not self.cleaners
-        ), f"cleanup: expected cleaners to be empty, got {self.cleaners!r}"
-        assert (
-            not self.namespaces
-        ), f"cleanup: expected namespaces to be empty, got {self.namespaces!r}"
-        assert (
-            not self.cgroups
-        ), f"cleanup: expected cgroups to be empty, got {self.cgroups!r}"
+        assert not self.cleaners, f"cleanup: expected cleaners to be empty, got {self.cleaners!r}"
+        assert not self.namespaces, (
+            f"cleanup: expected namespaces to be empty, got {self.namespaces!r}"
+        )
+        assert not self.cgroups, f"cleanup: expected cgroups to be empty, got {self.cgroups!r}"
 
     def add_cgroup(
         self,
@@ -523,9 +568,7 @@ class DummyNet:
     def cgroup_list(self) -> list[CGroupScoped]:
         """Returns a list of all cgroups. Runs 'find /sys/fs/cgroup -maxdepth 1 -mindepth 1 -type d'"""
 
-        result = self.shell.run(
-            cmd="find /sys/fs/cgroup -maxdepth 1 -mindepth 1 -type d"
-        )
+        result = self.shell.run(cmd="find /sys/fs/cgroup -maxdepth 1 -mindepth 1 -type d")
         cgroups: list[CGroupScoped] = []
 
         for line in result.stdout.splitlines():
