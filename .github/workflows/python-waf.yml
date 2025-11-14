@@ -36,14 +36,15 @@ jobs:
         run: apt update && apt install -y sudo iproute2 iputils-ping
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Run cleanup
-        run: ./bin/cleanup
       - name: Configure
         run: python3 waf configure
       - name: Build
         run: python3 waf
       - name: Test
         run: python3 waf --run_tests
+      - name: Run cleanup
+        if: failure()
+        run: ./bin/cleanup
   workflow-keepalive:
     if: github.event_name == 'schedule'
     runs-on: [self-hosted, vm, ubuntu-current]
