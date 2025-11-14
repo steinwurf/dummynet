@@ -36,6 +36,8 @@ jobs:
         run: apt update && apt install -y sudo iproute2 iputils-ping
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Run cleanup
+        run: ./bin/cleanup
       - name: Configure
         run: python3 waf configure
       - name: Build
