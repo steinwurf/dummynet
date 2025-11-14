@@ -1,11 +1,12 @@
 import re
 from subprocess import CalledProcessError
-from typing import Callable, NamedTuple, Self, List
+from typing import Callable, NamedTuple, Self, List, ClassVar
 from logging import Logger
 
 from collections import OrderedDict
 from dataclasses import dataclass, field
 
+from dummynet import errors
 from dummynet.cgroups import CGroup
 from dummynet.namespace_shell import NamespaceShell
 from dummynet.host_shell import HostShell
@@ -27,9 +28,6 @@ class CleanupItem(NamedTuple):
     cleaner: Callable
 
 
-cleaners: List[CleanupItem] = []
-
-
 @dataclass
 class DummyNet:
     """A DummyNet object is used to create a network of virtual ethernet
@@ -43,6 +41,7 @@ class DummyNet:
     )
     cgroups: OrderedDict[CGroupScoped, CGroup] = field(default_factory=OrderedDict)
     namespaces: OrderedDict[NamespaceScoped, Self] = field(default_factory=OrderedDict)
+    cleaners: ClassVar[List[CleanupItem]] = []
 
     def __enter__(self):
         return self
@@ -72,11 +71,12 @@ class DummyNet:
         # TODO: Find a cleaner solution given veth pairs, as its so easy to delete
         # another namespace first and break this cleaner.
         def cleaner():
-            self.shell.run(
-                cmd=f"ip link del {p1}",
-            )
+            try:
+                self.shell.run(cmd=f"ip link del {p1}")
+            except errors.RunInfoError:
+                self.shell.log.info(f"veth pair {p1!r} peer {p2!r} was already deleted?")
 
-        cleaners.append(CleanupItem(self.namespace, p1, "link_veth_add", cleaner))
+        self.cleaners.append(CleanupItem(self.namespace, p1, "link_veth_add", cleaner))
 
         return p1, p2
 
@@ -101,7 +101,7 @@ class DummyNet:
                 cmd=f"ip link del {interface} || echo 'Already deleted, continuing...'",
             )
 
-        cleaners.append(CleanupItem(self.namespace, interface, "link_vlan_add", cleaner))
+        self.cleaners.append(CleanupItem(self.namespace, interface, "link_vlan_add", cleaner))
 
         return interface
 
@@ -131,7 +131,7 @@ class DummyNet:
                 cmd=f"ip netns exec {namespace} ip link set {interface} netns {self.namespace}",
             )
 
-        cleaners.append(CleanupItem(namespace, interface, "link_set", cleaner))
+        self.cleaners.append(CleanupItem(namespace, interface, "link_set", cleaner))
 
     def link_list(self, link_type=None) -> list[InterfaceScoped]:
         """Returns the output of the 'ip link list' command parsed to a
@@ -185,8 +185,12 @@ class DummyNet:
 
         self.shell.run(cmd=f"ip link delete {interface}")
 
-        # WARN: Dangerous! We cannot rely on cleaners of interface anymore!
         # WARN: Veths cannot be trusted anymore, p2 is never tracked.
+        self.cleaners[:] = [
+            item
+            for item in self.cleaners
+            if not (item.namespace == self.namespace and item.target == interface)
+        ]
 
     def addr_add(self, ip: str, interface: InterfaceScoped | str) -> None:
         """Adds an IP-address to a network interface."""
@@ -200,7 +204,7 @@ class DummyNet:
                 cmd=f"ip addr del {ip} dev {interface}",
             )
 
-        cleaners.append(CleanupItem(self.namespace, interface, "addr_add", cleaner))
+        self.cleaners.append(CleanupItem(self.namespace, interface, "addr_add", cleaner))
 
     def addr_del(self, ip: str, interface: InterfaceScoped | str) -> None:
         """Deletes an IP-address to a network interface."""
@@ -212,7 +216,7 @@ class DummyNet:
         def cleaner():
             self.shell.run(cmd=f"ip addr add {ip} dev {interface}")
 
-        cleaners.append(CleanupItem(self.namespace, interface, "addr_del", cleaner))
+        self.cleaners.append(CleanupItem(self.namespace, interface, "addr_del", cleaner))
 
     def up(self, interface: InterfaceScoped | str) -> None:
         """Sets the given network device to 'up'"""
@@ -225,7 +229,7 @@ class DummyNet:
         def cleaner():
             self.shell.run(cmd=f"ip link set dev {interface} down")
 
-        cleaners.append(CleanupItem(self.namespace, interface, "up", cleaner))
+        self.cleaners.append(CleanupItem(self.namespace, interface, "up", cleaner))
 
     def down(self, interface: InterfaceScoped | str) -> None:
         """Sets the given network device to 'down'"""
@@ -238,7 +242,7 @@ class DummyNet:
         def cleaner():
             self.shell.run(cmd=f"ip link set dev {interface} up")
 
-        cleaners.append(CleanupItem(self.namespace, interface, "down", cleaner))
+        self.cleaners.append(CleanupItem(self.namespace, interface, "down", cleaner))
 
     def route(self, ip: str) -> None:
         """Sets a new default IP-route."""
@@ -249,7 +253,9 @@ class DummyNet:
         def cleaner():
             self.shell.run(cmd=f"ip route del default via {ip}")
 
-        cleaners.append(CleanupItem(self.namespace, InterfaceScoped(name="1"), "route", cleaner))
+        self.cleaners.append(
+            CleanupItem(self.namespace, InterfaceScoped(name="1"), "route", cleaner)
+        )
 
     def run(self, cmd: str, cwd=None) -> RunInfo:
         """Wrapper for the command-line access
@@ -436,7 +442,7 @@ class DummyNet:
 
         self.shell.run(cmd=f"ip netns delete {namespace}")
 
-        # TODO: Cleaner?
+        self.cleaners[:] = [item for item in self.cleaners if not item.namespace == namespace]
 
     def netns_add(self, name: str) -> Self:
         """Adds a new network namespace.
@@ -463,7 +469,9 @@ class DummyNet:
             self.netns_delete(namespace)
             self.namespaces.pop(namespace)
 
-        cleaners.append(CleanupItem(namespace, InterfaceScoped(name="1"), "netns_add", cleaner))
+        self.cleaners.append(
+            CleanupItem(namespace, InterfaceScoped(name="1"), "netns_add", cleaner)
+        )
 
         return dnet
 
@@ -475,7 +483,7 @@ class DummyNet:
         def cleaner():
             self.shell.run(cmd=f"ip link del {bridge}")
 
-        cleaners.append(CleanupItem(self.namespace, bridge, "bridge_add", cleaner))
+        self.cleaners.append(CleanupItem(self.namespace, bridge, "bridge_add", cleaner))
 
         return bridge
 
@@ -498,14 +506,14 @@ class DummyNet:
     def cleanup(self) -> None:
         """Cleans up all the created network namespaces and bridges"""
 
-        # self.shell.log.debug(f"Running cleanup with items {cleaners!r}")
+        # self.shell.log.debug(f"Running cleanup with items {self.cleaners!r}")
 
-        while cleaners:
-            namespace, target, reason, cleaner = cleaners.pop()
+        while self.cleaners:
+            namespace, target, reason, cleaner = self.cleaners.pop()
             self.shell.log.info(f"Running cleanup for {reason!r} by {target!r} in {namespace!r}")
             cleaner()
 
-        assert not cleaners, f"cleanup: expected cleaners to be empty, got {cleaners!r}"
+        assert not self.cleaners, f"cleanup: expected cleaners to be empty, got {self.cleaners!r}"
         assert not self.namespaces, (
             f"cleanup: expected namespaces to be empty, got {self.namespaces!r}"
         )
@@ -545,7 +553,7 @@ class DummyNet:
             cgroup.hard_clean()
             self.cgroups.pop(cgroup_scoped)
 
-        cleaners.append(CleanupItem(self.namespace, cgroup_scoped, "add_cgroup", cleaner))
+        self.cleaners.append(CleanupItem(self.namespace, cgroup_scoped, "add_cgroup", cleaner))
 
         return cgroup
 
