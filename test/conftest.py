@@ -48,15 +48,15 @@ def net(shell) -> Generator[DummyNet, None, None]:
     net = dummynet.DummyNet(shell=shell)
     # Ensure we are not reusing a namespace
     netns, cgroups, links = net.netns_list(), net.cgroup_list(), net.link_list()
-    assert netns == [], f"setup: expected no namespaces, found: {netns!r}."
-    assert cgroups == [], f"setup: expected no cgroups, found: {cgroups!r}."
     assert links == [], f"setup: expected no links, found: {links!r}."
+    assert cgroups == [], f"setup: expected no cgroups, found: {cgroups!r}."
+    assert netns == [], f"setup: expected no namespaces, found: {netns!r}."
 
     try:
         yield net
     finally:
         # Ensure cleanup happened
         netns, cgroups, links = net.netns_list(), net.cgroup_list(), net.link_list()
-        assert netns == [], f"teardown: expected no namespaces, found: {netns!r}."
-        assert cgroups == [], f"teardown: expected no cgroups, found: {cgroups!r}."
         assert links == [], f"teardown: expected no links, found: {links!r}."
+        assert cgroups == [], f"teardown: expected no cgroups, found: {cgroups!r}."
+        assert netns == [], f"teardown: expected no namespaces, found: {netns!r}."
