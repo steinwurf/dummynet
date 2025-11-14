@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+pushd "$(git rev-parse --show-toplevel)/src" >/dev/null
+
+sudo ../test-venv/bin/ipython -i -c '\
+import logging; \
+import os; \
+import atexit; \
+from dummynet import *; \
+log = logging.getLogger("dummynet"); \
+log.setLevel(logging.DEBUG); \
+sudo = os.getuid() != 0; \
+process_monitor = ProcessMonitor(log=log); \
+shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor); \
+net = DummyNet(shell=shell); \
+atexit.register(net.cleanup); \
+print("\n================= DummyNet ================="); \
+print("Available instances:"); \
+print("  - net: DummyNet instance"); \
+print("  - shell: HostShell instance"); \
+print("  - process_monitor: ProcessMonitor instance"); \
+print("  - log: Logger instance"); \
+print("============================================\n")'
+
+popd >/dev/null

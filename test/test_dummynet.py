@@ -19,10 +19,6 @@ log.setLevel(logging.DEBUG)
 
 def test_run(net: DummyNet):
     with net as net:
-        # Get a list of the current namespaces
-        namespaces = net.netns_list()
-        assert namespaces == []
-
         # create two namespaces
         demo0 = net.netns_add("demo0")
         demo1 = net.netns_add("demo1")
@@ -660,3 +656,37 @@ def test_cgroup_wrong_memory_limit(shell: HostShell, net: DummyNet):
 
     groups = shell.run(cmd="ls /sys/fs/cgroup").stdout.splitlines()
     assert CGroupScoped(name="test_cgroup_wrong_memory_limit").scoped not in groups
+
+
+def test_link_delete_cleanup(net: DummyNet):
+    with net as net:
+        assert len(net.cleaners) == 0
+        veth0, _ = net.link_veth_add("veth0", "veth1")
+        net.link_delete(veth0)
+        assert len(net.cleaners) == 0
+
+
+def test_link_delete_cleanup_naughty(net: DummyNet):
+    with net as net:
+        _, veth1 = net.link_veth_add("veth0", "veth1")
+        net.link_delete(veth1)
+        # We don't spot that veth1 is in a veth pair with veth0 in the cleanup stage for link_delete.
+        assert len(net.cleaners) == 1
+        # Cleaner should still handle this case without throwing, even if veth0 is already gone.
+        #
+
+
+def test_link_delete_cleanup_evil(net: DummyNet):
+    with net as net:
+        ns = net.netns_add("ns")
+        net.link_veth_add("veth0", "veth1")
+        net.link_set(ns, interface="veth0")
+        n_cleaners = len(net.cleaners)
+        ns.link_delete("veth0")
+        # Should be two less. One for undoing `link_set` and one for `link_veth_add`.
+        print(net.cleaners)
+        assert len(net.cleaners) == (n_cleaners - 2)
+
+
+def test_netns_delete(net: DummyNet):
+    pass

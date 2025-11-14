@@ -1,3 +1,6 @@
+from typing import Optional
+
+
 class NamespaceShell:
     def __init__(self, name: str, shell):
         self.name = name
@@ -21,6 +24,24 @@ class NamespaceShell:
 
         return self.shell.run(
             cmd=f"ip netns exec {self.name} {cmd}", cwd=cwd, env=env, timeout=timeout
+        )
+
+    def poll(
+        self,
+        cmd: str,
+        match_stdout: Optional[str] = None,
+        match_stderr: Optional[str] = None,
+        timeout: int = 15,
+        cwd=None,
+        env=None,
+    ):
+        return self.shell.poll(
+            cmd=f"ip netns exec {self.name} {cmd}",
+            match_stdout=match_stdout,
+            match_stderr=match_stderr,
+            cwd=cwd,
+            env=env,
+            timeout=timeout,
         )
 
     def run_async(self, cmd, daemon=False, cwd=None):
