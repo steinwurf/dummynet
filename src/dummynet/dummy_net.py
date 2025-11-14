@@ -49,7 +49,9 @@ class DummyNet:
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.cleanup()
 
-    def link_veth_add(self, p1_name: str, p2_name: str) -> tuple[InterfaceScoped, InterfaceScoped]:
+    def link_veth_add(
+        self, p1_name: str, p2_name: str
+    ) -> tuple[InterfaceScoped, InterfaceScoped]:
         """Adds a virtual ethernet between two endpoints.
 
         Name of the link will be 'p1_name@p2_name' when you look at 'ip addr'
@@ -74,7 +76,9 @@ class DummyNet:
             try:
                 self.shell.run(cmd=f"ip link del {p1}")
             except errors.RunInfoError:
-                self.shell.log.info(f"veth pair {p1!r} peer {p2!r} was already deleted?")
+                self.shell.log.info(
+                    f"veth pair {p1!r} peer {p2!r} was already deleted?"
+                )
 
         self.cleaners.append(CleanupItem(self.namespace, p1, "link_veth_add", cleaner))
 
@@ -101,7 +105,9 @@ class DummyNet:
                 cmd=f"ip link del {interface} || echo 'Already deleted, continuing...'",
             )
 
-        self.cleaners.append(CleanupItem(self.namespace, interface, "link_vlan_add", cleaner))
+        self.cleaners.append(
+            CleanupItem(self.namespace, interface, "link_vlan_add", cleaner)
+        )
 
         return interface
 
@@ -204,7 +210,9 @@ class DummyNet:
                 cmd=f"ip addr del {ip} dev {interface}",
             )
 
-        self.cleaners.append(CleanupItem(self.namespace, interface, "addr_add", cleaner))
+        self.cleaners.append(
+            CleanupItem(self.namespace, interface, "addr_add", cleaner)
+        )
 
     def addr_del(self, ip: str, interface: InterfaceScoped | str) -> None:
         """Deletes an IP-address to a network interface."""
@@ -216,7 +224,9 @@ class DummyNet:
         def cleaner():
             self.shell.run(cmd=f"ip addr add {ip} dev {interface}")
 
-        self.cleaners.append(CleanupItem(self.namespace, interface, "addr_del", cleaner))
+        self.cleaners.append(
+            CleanupItem(self.namespace, interface, "addr_del", cleaner)
+        )
 
     def up(self, interface: InterfaceScoped | str) -> None:
         """Sets the given network device to 'up'"""
@@ -442,7 +452,9 @@ class DummyNet:
 
         self.shell.run(cmd=f"ip netns delete {namespace}")
 
-        self.cleaners[:] = [item for item in self.cleaners if not item.namespace == namespace]
+        self.cleaners[:] = [
+            item for item in self.cleaners if not item.namespace == namespace
+        ]
 
     def netns_add(self, name: str) -> Self:
         """Adds a new network namespace.
@@ -487,7 +499,9 @@ class DummyNet:
 
         return bridge
 
-    def bridge_set(self, bridge: InterfaceScoped | str, interface: InterfaceScoped | str) -> None:
+    def bridge_set(
+        self, bridge: InterfaceScoped | str, interface: InterfaceScoped | str
+    ) -> None:
         """Adds an interface to a bridge"""
 
         interface = InterfaceScoped.from_any(interface)
@@ -510,14 +524,20 @@ class DummyNet:
 
         while self.cleaners:
             namespace, target, reason, cleaner = self.cleaners.pop()
-            self.shell.log.info(f"Running cleanup for {reason!r} by {target!r} in {namespace!r}")
+            self.shell.log.info(
+                f"Running cleanup for {reason!r} by {target!r} in {namespace!r}"
+            )
             cleaner()
 
-        assert not self.cleaners, f"cleanup: expected cleaners to be empty, got {self.cleaners!r}"
-        assert not self.namespaces, (
-            f"cleanup: expected namespaces to be empty, got {self.namespaces!r}"
-        )
-        assert not self.cgroups, f"cleanup: expected cgroups to be empty, got {self.cgroups!r}"
+        assert (
+            not self.cleaners
+        ), f"cleanup: expected cleaners to be empty, got {self.cleaners!r}"
+        assert (
+            not self.namespaces
+        ), f"cleanup: expected namespaces to be empty, got {self.namespaces!r}"
+        assert (
+            not self.cgroups
+        ), f"cleanup: expected cgroups to be empty, got {self.cgroups!r}"
 
     def add_cgroup(
         self,
@@ -553,14 +573,18 @@ class DummyNet:
             cgroup.hard_clean()
             self.cgroups.pop(cgroup_scoped)
 
-        self.cleaners.append(CleanupItem(self.namespace, cgroup_scoped, "add_cgroup", cleaner))
+        self.cleaners.append(
+            CleanupItem(self.namespace, cgroup_scoped, "add_cgroup", cleaner)
+        )
 
         return cgroup
 
     def cgroup_list(self) -> list[CGroupScoped]:
         """Returns a list of all cgroups. Runs 'find /sys/fs/cgroup -maxdepth 1 -mindepth 1 -type d'"""
 
-        result = self.shell.run(cmd="find /sys/fs/cgroup -maxdepth 1 -mindepth 1 -type d")
+        result = self.shell.run(
+            cmd="find /sys/fs/cgroup -maxdepth 1 -mindepth 1 -type d"
+        )
         cgroups: list[CGroupScoped] = []
 
         for line in result.stdout.splitlines():

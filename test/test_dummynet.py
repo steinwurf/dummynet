@@ -27,7 +27,9 @@ def test_run(net: DummyNet):
         # Get a list of the current namespaces
         namespaces = net.netns_list()
 
-        assert sorted(namespaces) == sorted([demo0.namespace, demo1.namespace, demo2.namespace])
+        assert sorted(namespaces) == sorted(
+            [demo0.namespace, demo1.namespace, demo2.namespace]
+        )
 
         # Add a bridge in demo1
         br0 = demo1.bridge_add("br0")
@@ -88,7 +90,9 @@ def test_run_strings(net: DummyNet):
 
         assert all(
             expected == actual.name
-            for expected, actual in zip(["demo0", "demo1", "demo2"], sorted(net.netns_list()))
+            for expected, actual in zip(
+                ["demo0", "demo1", "demo2"], sorted(net.netns_list())
+            )
         )
 
         # Add a bridge in demo1
