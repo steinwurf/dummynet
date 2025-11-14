@@ -191,11 +191,12 @@ class DummyNet:
 
         self.shell.run(cmd=f"ip link delete {interface}")
 
-        # WARN: Veths cannot be trusted anymore, p2 is never tracked.
+        # HACK: veths are not nicely handled since only one interface is tracked.
         self.cleaners[:] = [
             item
             for item in self.cleaners
-            if not (item.namespace == self.namespace and item.target == interface)
+            # HACK: Remove named interface from all interfaces
+            if not item.target == interface
         ]
 
     def addr_add(self, ip: str, interface: InterfaceScoped | str) -> None:

@@ -673,6 +673,19 @@ def test_link_delete_cleanup_naughty(net: DummyNet):
         # We don't spot that veth1 is in a veth pair with veth0 in the cleanup stage for link_delete.
         assert len(net.cleaners) == 1
         # Cleaner should still handle this case without throwing, even if veth0 is already gone.
+        #
+
+
+def test_link_delete_cleanup_evil(net: DummyNet):
+    with net as net:
+        ns = net.netns_add("ns")
+        net.link_veth_add("veth0", "veth1")
+        net.link_set(ns, interface="veth0")
+        n_cleaners = len(net.cleaners)
+        ns.link_delete("veth0")
+        # Should be two less. One for undoing `link_set` and one for `link_veth_add`.
+        print(net.cleaners)
+        assert len(net.cleaners) == (n_cleaners - 2)
 
 
 def test_netns_delete(net: DummyNet):
