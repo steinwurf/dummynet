@@ -21,14 +21,20 @@ class UploadContext(BuildContext):
 def options(opt):
     gr = opt.get_option_group("Build and installation options")
 
-    gr.add_option(
-        "--run_tests", default=False, action="store_true", help="Run all unit tests"
-    )
+    gr.add_option("--run_tests", default=False, action="store_true", help="Run all unit tests")
 
     gr.add_option(
         "--filter",
         default=None,
-        help='Select tests based on their name. E.g. "test_run_stdout"',
+        help='Select tests based on their name. E.g. "test_run"',
+    )
+
+    gr.add_option(
+        "--numprocesses",
+        "-n",
+        type="str",
+        default="logical",
+        help='Run tests across multiple threads. E.g. "auto", "logical", or a number.',
     )
 
     gr.add_option(
@@ -166,12 +172,14 @@ def _pytest_run(ctx):
     if os.path.exists(basetemp):
         waflib.extras.wurf.directory.remove_directory(path=basetemp)
 
-    test_filter = ""
+    cmd_opts = ""
     if ctx.options.filter:
-        test_filter = f"-k '{ctx.options.filter}'"
+        cmd_opts = f"-k '{ctx.options.filter}'"
+    if ctx.options.numprocesses:
+        cmd_opts = f"-n {ctx.options.numprocesses}"
 
     # Main test command
-    venv.run(f"python -B -m pytest -xrA {test_filter} --basetemp {basetemp} -n logical")
+    venv.run(f"python -B -m pytest -xrA {cmd_opts} --basetemp {basetemp}")
 
     # Check the package
     venv.run(f"twine check {wheel}")

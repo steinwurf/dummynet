@@ -2,6 +2,8 @@ import subprocess
 import os
 import time
 import getpass
+from datetime import datetime, timedelta
+from typing import Optional
 
 from . import run_info
 from . import errors
@@ -23,7 +25,7 @@ class HostShell(object):
         self.sudo = sudo
         self.process_monitor = process_monitor
 
-    def run(self, cmd: str, cwd=None, env=None, timeout=None):
+    def run(self, cmd: str, cwd=None, env=None, timeout=None) -> run_info.RunInfo:
         """Run a synchronous command (blocking) with a timeout.
 
         :param cmd: The command to run
@@ -43,6 +45,25 @@ class HostShell(object):
         return self.process_monitor.run_process(
             cmd=cmd, sudo=self.sudo, cwd=cwd, env=env, timeout=timeout
         )
+
+    def poll(
+        self,
+        cmd: str,
+        match_stdout: Optional[str] = None,
+        match_stderr: Optional[str] = None,
+        timeout: int = 15,
+        cwd=None,
+        env=None,
+    ):
+        future = datetime.now() + timedelta(seconds=timeout)
+        while datetime.now() <= future:
+            time.sleep(0.2)
+            out = self.run(cmd, cwd=cwd, env=env)
+            try:
+                return out.match(stdout=match_stdout, stderr=match_stderr)
+            except errors.MatchError:
+                continue
+        raise errors.TimeoutError("Match not found within timeout")
 
     def run_async(self, cmd: str, daemon=False, cwd=None, env=None):
         """Run an asynchronous command (non-blocking).

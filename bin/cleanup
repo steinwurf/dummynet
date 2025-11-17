@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+echo "Deleting all dummynet network namespaces..."
+sudo ip netns | awk '{print $1}' | grep '^d-' | while read ns; do
+  echo "  Deleting namespace: $ns"
+  sudo ip netns delete "$ns"
+done
+
+echo "Deleting all dummynet cgroups..."
+for cgroup in /sys/fs/cgroup/d-*; do
+  if [ -d "$cgroup" ]; then
+    echo "  Deleting cgroup: $(basename "$cgroup")"
+    sudo rmdir "$cgroup"
+  fi
+done
+
+echo "Deleting all dummynet interfaces..."
+sudo ip -o link show | awk -F': ' '{print $2}' | cut -d'@' -f1 | grep '^d-' | while read iface; do
+  echo "  Deleting interface: $iface"
+  sudo ip link delete dev "$iface" 2>/dev/null
+done

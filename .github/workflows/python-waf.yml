@@ -1,10 +1,6 @@
 name: Waf Python Tests
 "on":
   workflow_dispatch:
-    inputs:
-      extra_resolve_options:
-        description: Extra Resolve Options
-        required: false
   schedule:
     - cron: 0 1 * * *
   push:
@@ -30,7 +26,6 @@ jobs:
         --privileged
         --device /dev/net/tun
         --cgroupns host
-        --pid host
     steps:
       - name: Install dependencies
         run: apt update && apt install -y sudo iproute2 iputils-ping
@@ -42,6 +37,9 @@ jobs:
         run: python3 waf
       - name: Test
         run: python3 waf --run_tests
+      - name: Run cleanup
+        if: failure()
+        run: ./bin/cleanup
   workflow-keepalive:
     if: github.event_name == 'schedule'
     runs-on: [self-hosted, vm, ubuntu-current]
