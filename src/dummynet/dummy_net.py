@@ -1,5 +1,8 @@
+import atexit
 import re
 from subprocess import CalledProcessError
+import signal
+import weakref
 from typing import Callable, NamedTuple, Self, List, ClassVar
 from logging import Logger
 
@@ -43,11 +46,47 @@ class DummyNet:
     namespaces: OrderedDict[NamespaceScoped, Self] = field(default_factory=OrderedDict)
     cleaners: ClassVar[List[CleanupItem]] = []
 
+    def __post_init__(self):
+        # Configure weak refrenced cleanup handlers.
+        weak_self = weakref.ref(self)
+
+        def atexit_cleanup():
+            obj = weak_self()
+            if obj is not None:
+                obj.shell.log.debug("called atexit_cleanup")
+                obj.cleanup()
+
+        atexit.register(atexit_cleanup)
+        self._register_signal_handler(signal.SIGTERM)
+        self._register_signal_handler(signal.SIGINT)
+
+    def __del__(self):
+        self.shell.log.debug("called __del__")
+        self.cleanup()
+
     def __enter__(self):
+        self.shell.log.debug("called __enter__")
         return self
 
-    def __exit__(self, exc_type, exc_value, exc_traceback):
+    def __exit__(self, _exc_type, _exc_value, _exc_traceback):
+        self.shell.log.debug("called __exit__")
         self.cleanup()
+
+    def _register_signal_handler(self, signum: signal.Signals):
+        weak_self = weakref.ref(self)
+        prev_handler = signal.getsignal(signum)
+
+        def signal_handler(signum, _frame):
+            obj = weak_self()
+            if obj is not None:
+                signal.signal(signum, signal.SIG_IGN)
+                signame = signal.Signals(signum).name
+                obj.shell.log.debug(f"called signal_handler for {signame}")
+                obj.cleanup()
+            signal.signal(signum, prev_handler)
+            signal.raise_signal(signum)
+
+        signal.signal(signum, signal_handler)
 
     def link_veth_add(
         self, p1_name: str, p2_name: str
@@ -521,7 +560,7 @@ class DummyNet:
     def cleanup(self) -> None:
         """Cleans up all the created network namespaces and bridges"""
 
-        # self.shell.log.debug(f"Running cleanup with items {self.cleaners!r}")
+        self.shell.log.debug(f"Running cleanup with items {self.cleaners!r}")
 
         while self.cleaners:
             namespace, target, reason, cleaner = self.cleaners.pop()
