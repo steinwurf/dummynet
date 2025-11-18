@@ -1,7 +1,7 @@
 import re
 import json
 from subprocess import CalledProcessError
-from typing import Callable, NamedTuple, Self, List, ClassVar
+from typing import Callable, NamedTuple, Optional, Self, List, ClassVar
 from logging import Logger
 
 from collections import OrderedDict
@@ -264,10 +264,28 @@ class DummyNet:
             CleanupItem(self.namespace, interface, "addr_del", cleaner)
         )
 
+    def _current_administrative_state(
+        self, interface: InterfaceScoped | str
+    ) -> Optional[str]:
+        interface = InterfaceScoped.from_any(interface)
+        runinfo = self.shell.run(f"ip -j link show dev {interface}")
+        try:
+            device = json.loads(runinfo.stdout)[0]
+        except json.JSONDecodeError:
+            return None
+        if "UP" in device["flags"]:
+            return "up"
+        else:
+            return "down"
+
     def up(self, interface: InterfaceScoped | str) -> None:
         """Sets the given network device to 'up'"""
 
         interface = InterfaceScoped.from_any(interface)
+
+        # NOTE: If device does not exist, assume opposite state.
+        # TODO: Better checking for device existence.
+        prev_state: str = self._current_administrative_state(interface) or "down"
 
         self.shell.run(f"ip link set dev {interface} up")
 
@@ -283,9 +301,8 @@ class DummyNet:
             f"ip -j link show dev {interface}", match_lambda=match_lambda
         )
 
-        # WARN: Assumption, previous state was the opposite
         def cleaner():
-            self.shell.run(cmd=f"ip link set dev {interface} down")
+            self.shell.run(cmd=f"ip link set dev {interface} {prev_state}")
 
         self.cleaners.append(CleanupItem(self.namespace, interface, "up", cleaner))
 
@@ -293,6 +310,10 @@ class DummyNet:
         """Sets the given network device to 'down'"""
 
         interface = InterfaceScoped.from_any(interface)
+
+        # NOTE: If device does not exist, assume opposite state.
+        # TODO: Better checking for device existence.
+        prev_state: str = self._current_administrative_state(interface) or "up"
 
         self.shell.run(f"ip link set dev {interface} down")
 
@@ -302,7 +323,7 @@ class DummyNet:
 
         # WARN: Assumption, previous state was the opposite
         def cleaner():
-            self.shell.run(cmd=f"ip link set dev {interface} up")
+            self.shell.run(cmd=f"ip link set dev {interface} {prev_state}")
 
         self.cleaners.append(CleanupItem(self.namespace, interface, "down", cleaner))
 
