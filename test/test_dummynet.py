@@ -560,3 +560,17 @@ def test_down_previous_state_is_kept(shell: HostShell, net: DummyNet):
 
     assert net._current_administrative_state("v0") == "down"
     assert net._current_administrative_state("v1") == "down"
+
+
+def test_route_downup_teardown(net: DummyNet):
+    net.link_veth_add("v0", "v1")
+    net.addr_add("10.10.10.10", "v0")
+    net.addr_add("10.10.10.11", "v1")
+    net.up("v0")
+    net.up("v1")
+    net.route("10.10.10.10")
+
+    # Down and up should not stop the teardown from functioning.
+    net.down("v0")
+    time.sleep(0.2)
+    net.up("v0")

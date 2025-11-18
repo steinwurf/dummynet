@@ -79,7 +79,7 @@ class DummyNet:
             try:
                 self.shell.run(cmd=f"ip link del {p1}")
             except errors.RunInfoError:
-                self.shell.log.info(
+                self.shell.log.warning(
                     f"veth pair {p1!r} peer {p2!r} was already deleted?"
                 )
 
@@ -111,7 +111,7 @@ class DummyNet:
             try:
                 self.shell.run(cmd=f"ip link del {interface}")
             except errors.RunInfoError:
-                self.shell.log.info(f"vlan {interface!r} was already deleted?")
+                self.shell.log.warning(f"vlan {interface!r} was already deleted?")
 
         self.cleaners.append(
             CleanupItem(self.namespace, interface, "link_vlan_add", cleaner)
@@ -349,7 +349,12 @@ class DummyNet:
 
         # WARN: Assumption, previous state was the opposite
         def cleaner():
-            self.shell.run(cmd=f"ip route del default via {ip}")
+            try:
+                self.shell.run(cmd=f"ip route del default via {ip}")
+            except errors.RunInfoError:
+                self.shell.log.warning(
+                    f"Cannot remove default route via {ip!r}, did its device go down?"
+                )
 
         self.cleaners.append(
             CleanupItem(self.namespace, InterfaceScoped(name="1"), "route", cleaner)
