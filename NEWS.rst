@@ -6,6 +6,7 @@ every change, see the Git log.
 Latest
 ------
 * Major: iptables and tc lookup logic now requires a proper PATH variable to be set.
+* Minor: Most commands now wait to return until the change is available to use.
 
 7.0.1
 -----
