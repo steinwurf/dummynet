@@ -5,6 +5,10 @@ every change, see the Git log.
 
 Latest
 ------
+* tbd
+
+8.0.0
+-----
 * Major: iptables and tc lookup logic now requires a proper PATH variable to be set.
 * Minor: Most commands now wait to return until the change is available to use.
 * Minor: `DummyNet.link_delete` and `DummyNet.netns_delete` will now cleanly handle
