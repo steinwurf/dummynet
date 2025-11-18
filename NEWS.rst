@@ -5,6 +5,10 @@ every change, see the Git log.
 
 Latest
 ------
+* tbd
+
+8.0.1
+-----
 * Patch: Handle `DummyNet.route` rollback by warning if `DummyNet.down` is used
   against the same interface.
 
