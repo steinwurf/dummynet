@@ -32,8 +32,7 @@ def options(opt):
     gr.add_option(
         "--numprocesses",
         "-n",
-        type="str",
-        default="logical",
+        default=False,
         help='Run tests across multiple threads. E.g. "auto", "logical", or a number.',
     )
 
