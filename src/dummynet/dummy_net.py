@@ -1,7 +1,7 @@
 import re
 import json
 from subprocess import CalledProcessError
-from typing import Callable, NamedTuple, Optional, Self, List, ClassVar
+from typing import Callable, NamedTuple, Optional, Self, List
 from logging import Logger
 
 from collections import OrderedDict
@@ -42,7 +42,7 @@ class DummyNet:
     )
     cgroups: OrderedDict[CGroupScoped, CGroup] = field(default_factory=OrderedDict)
     namespaces: OrderedDict[NamespaceScoped, Self] = field(default_factory=OrderedDict)
-    cleaners: ClassVar[List[CleanupItem]] = []
+    cleaners: List[CleanupItem] = field(default_factory=list)
 
     def __enter__(self):
         return self
@@ -554,7 +554,9 @@ class DummyNet:
 
         # NOTE: Bad architecture, ideally we should not return a split-responsibility instance of itself
         ns_shell = NamespaceShell(name=namespace.scoped, shell=self.shell)
-        dnet = self.__class__(shell=ns_shell, namespace=namespace)
+        dnet = self.__class__(
+            shell=ns_shell, namespace=namespace, cleaners=self.cleaners
+        )
         self.namespaces[namespace] = dnet
 
         # Store cleanup function to remove the created namespace

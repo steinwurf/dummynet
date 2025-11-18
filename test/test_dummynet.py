@@ -688,5 +688,45 @@ def test_link_delete_cleanup_evil(net: DummyNet):
         assert len(net.cleaners) == (n_cleaners - 2)
 
 
-def test_netns_delete(net: DummyNet):
-    pass
+def test_up_previous_state_is_kept(shell: HostShell, net: DummyNet):
+    with net as net:
+        net.link_veth_add("v0", "v1")
+        net.addr_add("10.10.10.10", "v0")
+        net.addr_add("10.10.10.11", "v1")
+        net.up("v0")
+        net.up("v1")
+
+        with DummyNet(shell=shell) as net2:
+            net2.up("v0")
+            net2.up("v1")
+
+        assert net._current_administrative_state("v0") == "up"
+        assert net._current_administrative_state("v1") == "up"
+
+        with DummyNet(shell=shell) as net2:
+            net2.down("v0")
+            net2.down("v1")
+
+        assert net._current_administrative_state("v0") == "up"
+        assert net._current_administrative_state("v1") == "up"
+
+
+def test_down_previous_state_is_kept(shell: HostShell, net: DummyNet):
+    with net as net:
+        net.link_veth_add("v0", "v1")
+        net.addr_add("10.10.10.10", "v0")
+        net.addr_add("10.10.10.11", "v1")
+
+        with DummyNet(shell=shell) as net:
+            net.up("v0")
+            net.up("v0")
+
+        assert net._current_administrative_state("v0") == "down"
+        assert net._current_administrative_state("v1") == "down"
+
+        with DummyNet(shell=shell) as net:
+            net.down("v0")
+            net.down("v0")
+
+        assert net._current_administrative_state("v0") == "down"
+        assert net._current_administrative_state("v1") == "down"
