@@ -498,9 +498,11 @@ def test_link_delete_cleanup(net: DummyNet):
 def test_link_delete_cleanup_naughty(net: DummyNet):
     _, veth1 = net.link_veth_add("veth0", "veth1")
     net.link_delete(veth1)
-    # We don't spot that veth1 is in a veth pair with veth0 in the cleanup stage for link_delete.
+    # We don't spot that veth1 is in a veth pair with veth0 in the cleanup stage
+    # for link_delete.
     assert len(net.cleaners) == 1
-    # Cleaner should still handle this case without throwing, even if veth0 is already gone.
+    # Cleanup after the test should still handle this case without throwing,
+    # even if veth0 is already gone.
 
 
 def test_link_delete_cleanup_evil(net: DummyNet):
@@ -521,7 +523,8 @@ def test_up_previous_state_is_kept(shell: HostShell, net: DummyNet):
     net.up("v0")
     net.up("v1")
 
-    # Create a seperate dummynet instance to test cleanup only for its subset of commands.
+    # Create a seperate dummynet instance to test cleanup only for its subset
+    # of commands.
     with DummyNet(shell=shell) as net2:
         net2.up("v0")
         net2.up("v1")
@@ -542,7 +545,8 @@ def test_down_previous_state_is_kept(shell: HostShell, net: DummyNet):
     net.addr_add("10.10.10.10", "v0")
     net.addr_add("10.10.10.11", "v1")
 
-    # Create a seperate dummynet instance to test cleanup only for its subset of commands.
+    # Create a seperate dummynet instance to test cleanup only for its subset
+    # of commands.
     with DummyNet(shell=shell) as net:
         net.up("v0")
         net.up("v0")
