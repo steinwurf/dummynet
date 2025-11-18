@@ -5,7 +5,7 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Major: iptables and tc lookup logic now requires a proper PATH variable to be set.
 
 7.0.1
 -----

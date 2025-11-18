@@ -394,8 +394,6 @@ class DummyNet:
 
         interface = InterfaceScoped.from_any(interface)
 
-        extra_command = ""
-
         output = self.tc_show(interface=interface, cwd=cwd)
 
         if "netem" in output.stdout:
@@ -414,19 +412,7 @@ class DummyNet:
         if limit:
             cmd += f" limit {limit}"
 
-        try:
-            self.shell.run(cmd=cmd, cwd=cwd)
-        # TODO: Do not reimplement our own PATH subset.
-        except CalledProcessError as e:
-            if e.stderr == 'exec of "tc" failed: No such file or directory\n':
-                try:
-                    extra_command += "/usr/sbin/"
-                    self.shell.run(cmd=extra_command + cmd, cwd=cwd)
-
-                except CalledProcessError:
-                    raise
-            else:
-                raise
+        self.shell.run(cmd=cmd, cwd=cwd)
 
         # TODO: Poller?
         # TODO: Cleaner?
@@ -457,21 +443,10 @@ class DummyNet:
     def nat(self, ip: str, interface: InterfaceScoped | str) -> None:
         interface = InterfaceScoped.from_any(interface)
 
-        extra_command = ""
-        cmd = f"iptables -t nat -A POSTROUTING -s {ip} -o {interface} -j MASQUERADE"
-        # TODO: Do not reimplement our own PATH subset.
-        try:
-            self.shell.run(cmd=cmd)
-        except CalledProcessError as e:
-            if e.stderr == 'exec of "iptables" failed: No such file or directory\n':
-                try:
-                    extra_command += "/usr/sbin/"
-                    self.shell.run(cmd=extra_command + cmd)
+        self.shell.run(
+            cmd=f"iptables -t nat -A POSTROUTING -s {ip} -o {interface} -j MASQUERADE"
+        )
 
-                except CalledProcessError:
-                    raise
-            else:
-                raise
         # TODO: Poller
 
         def cleaner():
