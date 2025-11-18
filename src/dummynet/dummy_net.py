@@ -1,6 +1,7 @@
 import re
+import json
 from subprocess import CalledProcessError
-from typing import Callable, NamedTuple, Self, List, ClassVar
+from typing import Callable, NamedTuple, Optional, Self, List
 from logging import Logger
 
 from collections import OrderedDict
@@ -41,7 +42,7 @@ class DummyNet:
     )
     cgroups: OrderedDict[CGroupScoped, CGroup] = field(default_factory=OrderedDict)
     namespaces: OrderedDict[NamespaceScoped, Self] = field(default_factory=OrderedDict)
-    cleaners: ClassVar[List[CleanupItem]] = []
+    cleaners: List[CleanupItem] = field(default_factory=list)
 
     def __enter__(self):
         return self
@@ -65,8 +66,10 @@ class DummyNet:
         p1 = InterfaceScoped(name=p1_name)
         p2 = InterfaceScoped(name=p2_name)
 
-        self.shell.run(
-            cmd=f"ip link add {p1} type veth peer name {p2}",
+        self.shell.run(cmd=f"ip link add {p1} type veth peer name {p2}")
+
+        self.shell.poll_until(
+            f"ip -j link show dev {p1}", match_stdout=f'*"ifname":"{p1}"*'
         )
 
         # We only need to track one part of the veth, as deleting one destroys the other.
@@ -100,10 +103,15 @@ class DummyNet:
             cmd=f"ip link add link {parent_interface} name {interface} type vlan id {vlan_id}",
         )
 
+        self.shell.poll_until(
+            f"ip -j link show dev {interface}", match_stdout=f'*"ifname":"{interface}"*'
+        )
+
         def cleaner():
-            self.shell.run(
-                cmd=f"ip link del {interface} || echo 'Already deleted, continuing...'",
-            )
+            try:
+                self.shell.run(cmd=f"ip link del {interface}")
+            except errors.RunInfoError:
+                self.shell.log.info(f"vlan {interface!r} was already deleted?")
 
         self.cleaners.append(
             CleanupItem(self.namespace, interface, "link_vlan_add", cleaner)
@@ -130,6 +138,11 @@ class DummyNet:
 
         self.shell.run(
             cmd=f"ip link set {interface} netns {namespace}",
+        )
+
+        self.shell.poll_until(
+            f"ip netns exec {namespace} ip -j link show dev {interface}",
+            match_stdout=f'*"ifname":"{interface}"*',
         )
 
         def cleaner():
@@ -191,12 +204,16 @@ class DummyNet:
 
         self.shell.run(cmd=f"ip link delete {interface}")
 
+        self.shell.poll_until(
+            f"ip -j link show dev {interface}",
+            match_stderr=f'*Device "{interface}" does not exist.*',
+        )
+
+        # We do not want to have the burden to recreate the link precicely, so
+        # instead we remove all cleaners with the interface's name.
         # HACK: veths are not nicely handled since only one interface is tracked.
         self.cleaners[:] = [
-            item
-            for item in self.cleaners
-            # HACK: Remove named interface from all interfaces
-            if not item.target == interface
+            item for item in self.cleaners if not item.target == interface
         ]
 
     def addr_add(self, ip: str, interface: InterfaceScoped | str) -> None:
@@ -205,6 +222,8 @@ class DummyNet:
         interface = InterfaceScoped.from_any(interface)
 
         self.shell.run(f"ip addr add {ip} dev {interface}")
+
+        self.shell.poll_until(f"ip addr show dev {interface}", match_stdout=f"*{ip}*")
 
         def cleaner():
             self.shell.run(
@@ -222,6 +241,22 @@ class DummyNet:
 
         self.shell.run(f"ip addr del {ip} dev {interface}")
 
+        def match_lambda(line):
+            try:
+                device = json.loads(line)[0]
+            except json.JSONDecodeError:
+                return False
+
+            return not any(
+                f"{addr['local']}/{addr['prefixlen']}" == ip or addr["local"] == ip
+                for addr in device["addr_info"]
+            )
+
+        self.shell.poll_until(
+            f"ip -j addr show dev {interface}",
+            match_lambda=match_lambda,
+        )
+
         def cleaner():
             self.shell.run(cmd=f"ip addr add {ip} dev {interface}")
 
@@ -229,16 +264,45 @@ class DummyNet:
             CleanupItem(self.namespace, interface, "addr_del", cleaner)
         )
 
+    def _current_administrative_state(
+        self, interface: InterfaceScoped | str
+    ) -> Optional[str]:
+        interface = InterfaceScoped.from_any(interface)
+        runinfo = self.shell.run(f"ip -j link show dev {interface}")
+        try:
+            device = json.loads(runinfo.stdout)[0]
+        except json.JSONDecodeError:
+            return None
+        if "UP" in device["flags"]:
+            return "up"
+        else:
+            return "down"
+
     def up(self, interface: InterfaceScoped | str) -> None:
         """Sets the given network device to 'up'"""
 
         interface = InterfaceScoped.from_any(interface)
 
+        # NOTE: If device does not exist, assume opposite state.
+        # TODO: Better checking for device existence.
+        prev_state: str = self._current_administrative_state(interface) or "down"
+
         self.shell.run(f"ip link set dev {interface} up")
 
-        # WARN: Assumption, previous state was the opposite
+        def match_lambda(line):
+            try:
+                device = json.loads(line)[0]
+            except json.JSONDecodeError:
+                return False
+
+            return "UP" in device["flags"]
+
+        self.shell.poll_until(
+            f"ip -j link show dev {interface}", match_lambda=match_lambda
+        )
+
         def cleaner():
-            self.shell.run(cmd=f"ip link set dev {interface} down")
+            self.shell.run(cmd=f"ip link set dev {interface} {prev_state}")
 
         self.cleaners.append(CleanupItem(self.namespace, interface, "up", cleaner))
 
@@ -247,11 +311,19 @@ class DummyNet:
 
         interface = InterfaceScoped.from_any(interface)
 
+        # NOTE: If device does not exist, assume opposite state.
+        # TODO: Better checking for device existence.
+        prev_state: str = self._current_administrative_state(interface) or "up"
+
         self.shell.run(f"ip link set dev {interface} down")
+
+        self.shell.poll_until(
+            f"ip -j link show dev {interface}", match_stdout='*"operstate":"DOWN"*'
+        )
 
         # WARN: Assumption, previous state was the opposite
         def cleaner():
-            self.shell.run(cmd=f"ip link set dev {interface} up")
+            self.shell.run(cmd=f"ip link set dev {interface} {prev_state}")
 
         self.cleaners.append(CleanupItem(self.namespace, interface, "down", cleaner))
 
@@ -259,6 +331,21 @@ class DummyNet:
         """Sets a new default IP-route."""
 
         self.shell.run(f"ip route add default via {ip}")
+
+        def match_lambda(line):
+            addr = ip.split("/", 1)[0]
+
+            try:
+                routes = json.loads(line)
+            except json.JSONDecodeError:
+                return False
+
+            return any(
+                route["dst"] == "default" and route["gateway"] == addr
+                for route in routes
+            )
+
+        self.shell.poll_until("ip -j route", match_lambda=match_lambda)
 
         # WARN: Assumption, previous state was the opposite
         def cleaner():
@@ -328,8 +415,6 @@ class DummyNet:
 
         interface = InterfaceScoped.from_any(interface)
 
-        extra_command = ""
-
         output = self.tc_show(interface=interface, cwd=cwd)
 
         if "netem" in output.stdout:
@@ -348,19 +433,10 @@ class DummyNet:
         if limit:
             cmd += f" limit {limit}"
 
-        try:
-            self.shell.run(cmd=cmd, cwd=cwd)
-        # TODO: Do not reimplement our own PATH subset.
-        except CalledProcessError as e:
-            if e.stderr == 'exec of "tc" failed: No such file or directory\n':
-                try:
-                    extra_command += "/usr/sbin/"
-                    self.shell.run(cmd=extra_command + cmd, cwd=cwd)
+        self.shell.run(cmd=cmd, cwd=cwd)
 
-                except CalledProcessError:
-                    raise
-            else:
-                raise
+        # TODO: Poller?
+        # TODO: Cleaner?
 
     def forward(
         self, from_interface: InterfaceScoped | str, to_interface: InterfaceScoped | str
@@ -374,28 +450,32 @@ class DummyNet:
             f"iptables -A FORWARD -o {from_interface} -i {to_interface} -j ACCEPT",
         )
 
-        # TODO: Cleaner
+        # TODO: Poller
+
+        def cleaner():
+            self.shell.run(
+                cmd=f"iptables -D FORWARD -o {from_interface} -i {to_interface} -j ACCEPT"
+            )
+
+        self.cleaners.append(
+            CleanupItem(self.namespace, from_interface, "forward", cleaner)
+        )
 
     def nat(self, ip: str, interface: InterfaceScoped | str) -> None:
         interface = InterfaceScoped.from_any(interface)
 
-        extra_command = ""
-        cmd = f"iptables -t nat -A POSTROUTING -s {ip} -o {interface} -j MASQUERADE"
-        # TODO: Do not reimplement our own PATH subset.
-        try:
-            self.shell.run(cmd=cmd)
-        except CalledProcessError as e:
-            if e.stderr == 'exec of "iptables" failed: No such file or directory\n':
-                try:
-                    extra_command += "/usr/sbin/"
-                    self.shell.run(cmd=extra_command + cmd)
+        self.shell.run(
+            cmd=f"iptables -t nat -A POSTROUTING -s {ip} -o {interface} -j MASQUERADE"
+        )
 
-                except CalledProcessError:
-                    raise
-            else:
-                raise
+        # TODO: Poller
 
-        # TODO: Cleaner
+        def cleaner():
+            self.shell.run(
+                cmd=f"iptables -t nat -D POSTROUTING -s {ip} -o {interface} -j MASQUERADE"
+            )
+
+        self.cleaners.append(CleanupItem(self.namespace, interface, "nat", cleaner))
 
     def netns_list(self) -> list[NamespaceScoped]:
         """Returns a list of all network namespaces. Runs 'ip netns list'"""
@@ -470,9 +550,13 @@ class DummyNet:
 
         self.shell.run(cmd=f"ip netns add {namespace}")
 
+        # TODO: Poller
+
         # NOTE: Bad architecture, ideally we should not return a split-responsibility instance of itself
         ns_shell = NamespaceShell(name=namespace.scoped, shell=self.shell)
-        dnet = self.__class__(shell=ns_shell, namespace=namespace)
+        dnet = self.__class__(
+            shell=ns_shell, namespace=namespace, cleaners=self.cleaners
+        )
         self.namespaces[namespace] = dnet
 
         # Store cleanup function to remove the created namespace
@@ -493,6 +577,8 @@ class DummyNet:
         bridge = InterfaceScoped(name=name, uid=self.namespace.uid)
         self.shell.run(cmd=f"ip link add name {bridge} type bridge")
 
+        # TODO: Poller
+
         def cleaner():
             self.shell.run(cmd=f"ip link del {bridge}")
 
@@ -508,11 +594,16 @@ class DummyNet:
         interface = InterfaceScoped.from_any(interface)
         bridge = InterfaceScoped.from_any(bridge)
 
-        self.shell.run(
-            cmd=f"ip link set {interface} master {bridge}",
-        )
+        self.shell.run(cmd=f"ip link set {interface} master {bridge}")
 
-        # TODO: Cleaner
+        # TODO: Poller
+
+        def cleaner():
+            self.shell.run(cmd=f"ip link set {interface} nomaster")
+
+        self.cleaners.append(
+            CleanupItem(self.namespace, interface, "bridge_set", cleaner)
+        )
 
     def bridge_list(self) -> list[InterfaceScoped]:
         """List the different bridges"""
@@ -569,6 +660,8 @@ class DummyNet:
             memory_limit=memory_limit,
         )
         self.cgroups[cgroup_scoped] = cgroup
+
+        # TODO: Poller?
 
         def cleaner():
             cgroup.hard_clean()

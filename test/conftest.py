@@ -55,6 +55,7 @@ def net(shell) -> Generator[DummyNet, None, None]:
     try:
         yield net
     finally:
+        net.cleanup()
         # Ensure cleanup happened
         netns, cgroups, links = net.netns_list(), net.cgroup_list(), net.link_list()
         assert links == [], f"teardown: expected no links, found: {links!r}."

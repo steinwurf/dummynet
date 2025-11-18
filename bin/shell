@@ -8,6 +8,7 @@ import atexit; \
 from dummynet import *; \
 log = logging.getLogger("dummynet"); \
 log.setLevel(logging.DEBUG); \
+logging.basicConfig(level=20); \
 sudo = os.getuid() != 0; \
 process_monitor = ProcessMonitor(log=log); \
 shell = HostShell(log=log, sudo=sudo, process_monitor=process_monitor); \

@@ -5,7 +5,12 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Major: iptables and tc lookup logic now requires a proper PATH variable to be set.
+* Minor: Most commands now wait to return until the change is available to use.
+* Minor: `DummyNet.link_delete` and `DummyNet.netns_delete` will now cleanly handle
+  their cleanup process.
+* Minor: `DummyNet.up` and `DummyNet.down` will now correctly restore previous
+  administrative states on cleanup.
 
 7.0.1
 -----

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Callable, Optional
 
 
 class NamespaceShell:
@@ -26,19 +26,21 @@ class NamespaceShell:
             cmd=f"ip netns exec {self.name} {cmd}", cwd=cwd, env=env, timeout=timeout
         )
 
-    def poll(
+    def poll_until(
         self,
         cmd: str,
         match_stdout: Optional[str] = None,
         match_stderr: Optional[str] = None,
+        match_lambda: Optional[Callable] = None,
         timeout: int = 15,
         cwd=None,
         env=None,
     ):
-        return self.shell.poll(
+        return self.shell.poll_until(
             cmd=f"ip netns exec {self.name} {cmd}",
             match_stdout=match_stdout,
             match_stderr=match_stderr,
+            match_lambda=match_lambda,
             cwd=cwd,
             env=env,
             timeout=timeout,
