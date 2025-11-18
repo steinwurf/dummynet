@@ -542,8 +542,8 @@ def test_up_previous_state_is_kept(shell: HostShell, net: DummyNet):
 
 def test_down_previous_state_is_kept(shell: HostShell, net: DummyNet):
     net.link_veth_add("v0", "v1")
-    net.addr_add("10.10.10.10", "v0")
-    net.addr_add("10.10.10.11", "v1")
+    net.addr_add("10.10.11.10", "v0")
+    net.addr_add("10.10.11.11", "v1")
 
     # Create a seperate dummynet instance to test cleanup only for its subset
     # of commands.
@@ -564,11 +564,11 @@ def test_down_previous_state_is_kept(shell: HostShell, net: DummyNet):
 
 def test_route_downup_teardown(net: DummyNet):
     net.link_veth_add("v0", "v1")
-    net.addr_add("10.10.10.10", "v0")
-    net.addr_add("10.10.10.11", "v1")
+    net.addr_add("10.10.12.10", "v0")
+    net.addr_add("10.10.12.11", "v1")
     net.up("v0")
     net.up("v1")
-    net.route("10.10.10.10")
+    net.route("10.10.12.10")
 
     # Down and up should not stop the teardown from functioning.
     net.down("v0")
