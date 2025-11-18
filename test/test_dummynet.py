@@ -568,9 +568,12 @@ def test_route_downup_teardown(net: DummyNet):
     net.addr_add("10.10.12.11", "v1")
     net.up("v0")
     net.up("v1")
+    net.shell.log.info(net.shell.run("ip route").stdout)
     net.route("10.10.12.10")
+    net.shell.log.info(net.shell.run("ip route").stdout)
 
     # Down and up should not stop the teardown from functioning.
     net.down("v0")
     time.sleep(0.2)
     net.up("v0")
+    net.shell.log.info(net.shell.run("ip route").stdout)
