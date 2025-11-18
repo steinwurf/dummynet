@@ -1,4 +1,5 @@
 import fnmatch
+from typing import Callable, Optional
 
 from . import errors
 
@@ -47,10 +48,10 @@ class RunInfo:
         self.stdout = stdout
         self.stderr = stderr
         self.returncode = returncode
-        self.is_async = is_async
-        self.is_daemon = is_daemon
-        self.stdout_callback = None
-        self.stderr_callback = None
+        self.is_async: bool = is_async
+        self.is_daemon: bool = is_daemon
+        self.stdout_callback: Optional[Callable] = None
+        self.stderr_callback: Optional[Callable] = None
         self.timeout = timeout
 
     def match(self, stdout=None, stderr=None):
