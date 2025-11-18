@@ -3,7 +3,7 @@ import os
 import time
 import getpass
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Callable, Optional
 
 from . import run_info
 from . import errors
@@ -46,23 +46,38 @@ class HostShell(object):
             cmd=cmd, sudo=self.sudo, cwd=cwd, env=env, timeout=timeout
         )
 
-    def poll(
+    def poll_until(
         self,
         cmd: str,
         match_stdout: Optional[str] = None,
         match_stderr: Optional[str] = None,
+        match_lambda: Optional[Callable] = None,
         timeout: int = 15,
         cwd=None,
         env=None,
-    ):
+    ) -> None:
         future = datetime.now() + timedelta(seconds=timeout)
         while datetime.now() <= future:
-            time.sleep(0.2)
-            out = self.run(cmd, cwd=cwd, env=env)
             try:
-                return out.match(stdout=match_stdout, stderr=match_stderr)
+                runinfo = self.run(cmd, cwd=cwd, env=env)
+            except errors.RunInfoError as err:
+                runinfo = err.info
+            try:
+                if match_stdout or match_stderr:
+                    return runinfo.match(stdout=match_stdout, stderr=match_stderr)
+                elif match_lambda:
+                    stdout = match_lambda(runinfo.stdout)
+                    if stdout:
+                        return
+                    stderr = match_lambda(runinfo.stderr)
+                    if stderr:
+                        return
+                else:
+                    raise ValueError("No match statements were used for polling!")
             except errors.MatchError:
-                continue
+                pass
+            time.sleep(0.2)
+
         raise errors.TimeoutError("Match not found within timeout")
 
     def run_async(self, cmd: str, daemon=False, cwd=None, env=None):
