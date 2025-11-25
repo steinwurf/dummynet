@@ -5,7 +5,11 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Major: Cleanup stage will now always validate DummyNets internal state for processes,
+  meaning bad use will now correctly throw exceptions, when invalid state previously
+  was silently ignored.
+* Major: Cleanup will now cleanly handle invalid state and still clean up all managed
+  networks, namespaces and cgroups.
 
 8.0.1
 -----
