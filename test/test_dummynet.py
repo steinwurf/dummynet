@@ -563,17 +563,19 @@ def test_down_previous_state_is_kept(shell: HostShell, net: DummyNet):
 
 
 def test_route_downup_teardown(net: DummyNet):
-    net.link_veth_add("v0", "v1")
-    net.addr_add("10.10.12.10", "v0")
-    net.addr_add("10.10.12.11", "v1")
-    net.up("v0")
-    net.up("v1")
-    net.shell.log.info(net.shell.run("ip route").stdout)
-    net.route("10.10.12.10")
-    net.shell.log.info(net.shell.run("ip route").stdout)
+    ns = net.netns_add("ns")
+
+    ns.link_veth_add("v0", "v1")
+    ns.addr_add("10.10.12.10", "v0")
+    ns.addr_add("10.10.12.11", "v1")
+    ns.up("v0")
+    ns.up("v1")
+    ns.shell.run("ip route")
+    ns.route("10.10.12.10")
+    ns.shell.run("ip route")
 
     # Down and up should not stop the teardown from functioning.
-    net.down("v0")
+    ns.down("v0")
     time.sleep(0.2)
-    net.up("v0")
-    net.shell.log.info(net.shell.run("ip route").stdout)
+    ns.up("v0")
+    ns.shell.run("ip route")
