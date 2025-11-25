@@ -370,10 +370,11 @@ class ProcessMonitor:
 
         return False
 
-    def stop(self):
+    def stop(self, validate_state: bool = True):
         """Stop all processes"""
 
-        self._validate_state()
+        if validate_state:
+            self._validate_state()
 
         for process in self.processes:
             process.stop()

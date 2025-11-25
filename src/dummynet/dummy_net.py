@@ -617,7 +617,15 @@ class DummyNet:
     def cleanup(self) -> None:
         """Cleans up all the created network namespaces and bridges"""
 
-        # self.shell.log.debug(f"Running cleanup with items {self.cleaners!r}")
+        # Clean up dangling processes.
+        exceptions = None
+        try:
+            self.shell.process_monitor.stop()
+        except ExceptionGroup as e:
+            # Capture dangling error
+            exceptions = e
+            # Force cleanup for cleanup to still run.
+            self.shell.process_monitor.stop(validate_state=False)
 
         while self.cleaners:
             namespace, target, reason, cleaner = self.cleaners.pop()
@@ -635,6 +643,9 @@ class DummyNet:
         assert (
             not self.cgroups
         ), f"cleanup: expected cgroups to be empty, got {self.cgroups!r}"
+
+        if exceptions:
+            raise exceptions
 
     def add_cgroup(
         self,

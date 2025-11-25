@@ -1,4 +1,5 @@
 import dummynet
+from dummynet import errors
 from dummynet import (
     DummyNet,
     HostShell,
@@ -6,7 +7,10 @@ from dummynet import (
 )
 
 import logging
+import signal
 import time
+import os
+
 import pytest
 
 
@@ -562,6 +566,22 @@ def test_down_previous_state_is_kept(shell: HostShell, net: DummyNet):
     assert net._current_administrative_state("v1") == "down"
 
 
+def test_route_down_teardown(net: DummyNet):
+    ns = net.netns_add("ns")
+
+    ns.link_veth_add("v0", "v1")
+    ns.addr_add("10.10.12.10", "v0")
+    ns.addr_add("10.10.12.11", "v1")
+    ns.up("v0")
+    ns.up("v1")
+    ns.shell.run("ip route")
+    ns.route("10.10.12.10")
+    ns.shell.run("ip route")
+
+    # Down should only make teardown throw a warning on deleting the route.
+    ns.down("v0")
+
+
 def test_route_downup_teardown(net: DummyNet):
     ns = net.netns_add("ns")
 
@@ -579,3 +599,39 @@ def test_route_downup_teardown(net: DummyNet):
     time.sleep(0.2)
     ns.up("v0")
     ns.shell.run("ip route")
+
+
+def test_cleanup_daemon_death(shell: HostShell):
+    net = DummyNet(shell=shell)
+
+    demo = net.netns_add("demo")
+    # A daemon should never return, oops!
+    demo.shell.run_async("echo", daemon=True)
+    # Allow some polls to run in the background.
+    time.sleep(0.1 * 5)
+
+    # Quickly set up a fail-and-recover cleaner
+    demo.link_veth_add("v0", "v1")
+    demo.addr_add("10.10.12.10", "v0")
+    demo.addr_add("10.10.12.11", "v1")
+    demo.up("v0")
+    demo.up("v1")
+    demo.route("10.10.12.10")
+    # Removes route as well, causing a handled exception through cleanup.
+    demo.down("v0")
+
+    # This should raise, but also have cleaned up correctly.
+    with pytest.raises(ExceptionGroup) as exception:
+        net.cleanup()
+
+    # Ensure we only got 1 DaemonExitError exception, and nothing else.
+    assert exception.type is ExceptionGroup
+    daemon_exceptions, other_exceptions = exception.value.split(errors.DaemonExitError)
+    assert daemon_exceptions is not None and len(daemon_exceptions.exceptions) == 1
+    assert other_exceptions is None
+
+    # Ensure cleanup was successful, even when we errored.
+    netns, cgroups, links = net.netns_list(), net.cgroup_list(), net.link_list()
+    assert links == [], f"teardown: expected no links, found: {links!r}."
+    assert cgroups == [], f"teardown: expected no cgroups, found: {cgroups!r}."
+    assert netns == [], f"teardown: expected no namespaces, found: {netns!r}."
