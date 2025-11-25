@@ -5,6 +5,10 @@ every change, see the Git log.
 
 Latest
 ------
+* tbd
+
+9.0.0
+-----
 * Major: Cleanup stage will now always validate DummyNets internal state for processes,
   meaning bad use will now correctly throw exceptions, when invalid state previously
   was silently ignored.
