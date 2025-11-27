@@ -5,6 +5,10 @@ every change, see the Git log.
 
 Latest
 ------
+* tbd
+
+9.1.0
+-----
 * Minor: Add `stop_process_async` function to `ProcessMonitor` to allow early return of
   processes running as async.
 
