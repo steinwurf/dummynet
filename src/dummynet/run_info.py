@@ -47,12 +47,12 @@ class RunInfo:
         self.pid = pid
         self.stdout = stdout
         self.stderr = stderr
-        self.returncode = returncode
+        self.returncode: Optional[int] = returncode
         self.is_async: bool = is_async
         self.is_daemon: bool = is_daemon
         self.stdout_callback: Optional[Callable] = None
         self.stderr_callback: Optional[Callable] = None
-        self.timeout = timeout
+        self.timeout: Optional[int | float] = timeout
 
     def match(self, stdout=None, stderr=None):
         """Matches the lines in the output with the pattern. The match

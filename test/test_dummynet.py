@@ -1,5 +1,6 @@
 import dummynet
 from dummynet import errors
+from dummynet.run_info import RunInfo
 from dummynet import (
     DummyNet,
     HostShell,
@@ -635,3 +636,25 @@ def test_cleanup_daemon_death(shell: HostShell):
     assert links == [], f"teardown: expected no links, found: {links!r}."
     assert cgroups == [], f"teardown: expected no cgroups, found: {cgroups!r}."
     assert netns == [], f"teardown: expected no namespaces, found: {netns!r}."
+
+
+def test_stop_process_async(process_monitor: ProcessMonitor):
+    daemon = process_monitor.run_process_async("sleep 100", sudo=False, daemon=True)
+    process_monitor.stop_process_async(daemon)
+
+    process = process_monitor.run_process_async("sleep 100", sudo=False, daemon=False)
+    process_monitor.stop_process_async(process)
+
+    fake_process = RunInfo(
+        cmd="echo",
+        cwd=None,
+        pid=None,
+        stdout=None,
+        stderr=None,
+        returncode=None,
+        is_async=False,
+        is_daemon=False,
+        timeout=None,
+    )
+    with pytest.raises(ValueError):
+        process_monitor.stop_process_async(fake_process)

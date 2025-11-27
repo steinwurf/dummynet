@@ -275,7 +275,7 @@ class ProcessMonitor:
         # The log object
         self.log = log
 
-        # Daemons
+        # Daemons (always running)
         self.daemons = []
 
         # Programs (still running)
@@ -284,7 +284,9 @@ class ProcessMonitor:
         # The poller is used to wait for processes to terminate
         self.poller = ProcessMonitor.Poller(log=log)
 
-    def run_process(self, cmd: str, sudo, cwd=None, env=None, timeout=None):
+    def run_process(
+        self, cmd: str, sudo, cwd=None, env=None, timeout=None
+    ) -> run_info.RunInfo:
         try:
             process = ProcessMonitor.Process(
                 cmd=cmd,
@@ -310,7 +312,9 @@ class ProcessMonitor:
             # Re-raise the exception to make sure the caller knows
             raise
 
-    def run_process_async(self, cmd: str, sudo, daemon=False, cwd=None, env=None):
+    def run_process_async(
+        self, cmd: str, sudo, daemon=False, cwd=None, env=None
+    ) -> run_info.RunInfo:
         try:
             process = ProcessMonitor.Process(
                 cmd=cmd,
@@ -370,8 +374,33 @@ class ProcessMonitor:
 
         return False
 
+    def stop_process_async(self, target: run_info.RunInfo):
+        """Stop and remove a process managed by ProcessMonitor.
+
+        :param target: The RunInfo object returned by `run_process_async`
+            you want to stop.
+        """
+        for daemon in self.daemons:
+            if daemon.popen.pid == target.pid:
+                daemon.stop()
+                self.daemons.remove(daemon)
+                return
+
+        for process in self.processes:
+            if process.popen.pid == target.pid:
+                process.stop()
+                self.processes.remove(process)
+                return
+
+        raise ValueError(f"Process with pid {target.pid!r} is not managed by {self!r}")
+
     def stop(self, validate_state: bool = True):
-        """Stop all processes"""
+        """Stop all processes
+
+        :param validate_state: If we should validate state before
+            stopping all processes and daemons. Do not disable this
+            unless you know what you are doing!
+        """
 
         if validate_state:
             self._validate_state()
