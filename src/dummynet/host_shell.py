@@ -101,7 +101,7 @@ class HostShell(object):
         )
 
     def _add_sudo_prefix(self, cmd: str | list[str]) -> str | list[str]:
-        sudo_prefix = ["sudo", "--reset-timestamp ", "--stdin", "--preserve-env"]
+        sudo_prefix = ["sudo", "--reset-timestamp", "--stdin", "--preserve-env"]
         if isinstance(cmd, str):
             return " ".join(sudo_prefix) + " " + cmd
         if isinstance(cmd, list):
