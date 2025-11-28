@@ -5,6 +5,10 @@ every change, see the Git log.
 
 Latest
 ------
+* tbd
+
+9.2.1
+-----
 * Patch: Fixed bad sudo argument in `HostShell` causing failures when called.
 
 9.2.0
