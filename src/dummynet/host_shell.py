@@ -23,7 +23,9 @@ class HostShell(object):
         self.sudo = sudo
         self.process_monitor = process_monitor
 
-    def run(self, cmd: str, cwd=None, env=None, timeout=None) -> run_info.RunInfo:
+    def run(
+        self, cmd: str | list[str], cwd=None, env=None, timeout=None
+    ) -> run_info.RunInfo:
         """Run a synchronous command (blocking) with a timeout.
 
         :param cmd: The command to run
@@ -33,7 +35,7 @@ class HostShell(object):
         """
 
         if self.sudo:
-            cmd = "sudo -k -S -E " + cmd
+            cmd = self._add_sudo(cmd)
 
         if env is None:
             env = os.environ.copy()
@@ -78,7 +80,7 @@ class HostShell(object):
 
         raise errors.TimeoutError("Match not found within timeout")
 
-    def run_async(self, cmd: str, daemon=False, cwd=None, env=None):
+    def run_async(self, cmd: str | list[str], daemon=False, cwd=None, env=None):
         """Run an asynchronous command (non-blocking).
 
         :param cmd: The command to run
@@ -87,13 +89,21 @@ class HostShell(object):
         """
 
         if self.sudo:
-            cmd = "sudo -S -E " + cmd
+            cmd = self._add_sudo(cmd)
 
         if env is None:
             env = os.environ.copy()
 
-        self.log.debug(cmd)
+        self.log.info(f"running {cmd!r}")
 
         return self.process_monitor.run_process_async(
             cmd=cmd, sudo=self.sudo, daemon=daemon, cwd=cwd, env=env
         )
+
+    def _add_sudo(self, cmd: str | list[str]) -> str | list[str]:
+        """Prepends sudo with flags to a given command"""
+        sudo_prefix = ["sudo", "--reset-timestamp ", "--stdin", "--preserve-env"]
+        if isinstance(cmd, str):
+            return " ".join(sudo_prefix) + " " + cmd
+        if isinstance(cmd, list):
+            return sudo_prefix + cmd

@@ -42,11 +42,11 @@ class RunInfo:
         :param timeout: The timeout in seconds, if None then no timeout
         """
 
-        self.cmd = cmd
-        self.cwd = cwd
-        self.pid = pid
-        self.stdout = stdout
-        self.stderr = stderr
+        self.cmd: str | list[str] = cmd
+        self.cwd: Optional[str] = cwd
+        self.pid: int = pid
+        self.stdout: str = stdout
+        self.stderr: str = stderr
         self.returncode: Optional[int] = returncode
         self.is_async: bool = is_async
         self.is_daemon: bool = is_daemon

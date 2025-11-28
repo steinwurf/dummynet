@@ -1,9 +1,10 @@
 import select
-import textwrap
+import logging
 import os
 import subprocess
 import signal
 import getpass
+import time
 
 from functools import lru_cache
 from typing import Optional
@@ -14,6 +15,8 @@ from . import run_info
 
 # The cached sudo password
 cached_sudo_password: Optional[str] = None
+
+log = logging.getLogger("dummynet")
 
 
 @lru_cache(maxsize=None)
@@ -146,12 +149,23 @@ class ProcessMonitor:
         """A process object to track the state of a process"""
 
         def __init__(
-            self, cmd: str, cwd, env, sudo, is_async, is_daemon, timeout, poller
+            self,
+            cmd: str | list[str],
+            cwd: Optional[str],
+            env,
+            sudo: bool,
+            is_async: bool,
+            is_daemon: bool,
+            timeout: Optional[int | float],
+            poller: "ProcessMonitor.Poller",
         ):
             """Construct a new process object."""
 
             if sudo:
                 update_sudo_password()
+
+            # Run inside wrapped /bin/sh environment when cmd is string.
+            shell = isinstance(cmd, str)
 
             self.popen = subprocess.Popen(
                 cmd,
@@ -160,7 +174,7 @@ class ProcessMonitor:
                 stderr=subprocess.PIPE,
                 cwd=cwd,
                 env=env,
-                shell=True,
+                shell=shell,
                 # Get stdout and stderr as text
                 text=True,
                 # Make sure we can kill the process and the subprocesses
@@ -190,10 +204,7 @@ class ProcessMonitor:
             )
 
             def stdout_callback(data):
-                if self.info.stdout is None:
-                    self.info.stdout = data
-                else:
-                    self.info.stdout += data
+                self.info.stdout += data
 
                 if self.info.stdout_callback:
                     self.info.stdout_callback(data)
@@ -218,7 +229,10 @@ class ProcessMonitor:
                 stderr_callback,
             )
 
-            if not is_async:
+            if is_async:
+                # Allow async process to get established by giving it 50ms.
+                time.sleep(0.05)
+            else:
                 try:
                     self.info.returncode = self.popen.wait(timeout=self.info.timeout)
 
@@ -251,7 +265,7 @@ class ProcessMonitor:
 
             return self.info.returncode is None
 
-        def stop(self):
+        def stop(self, timeout: float = 1.0):
             """Stop a process"""
 
             self.info.returncode = self.popen.poll()
@@ -260,12 +274,14 @@ class ProcessMonitor:
                 return
 
             # See start_new_sesstion in __init__ for why we use os.killpg
+            log.debug(f"Sending SIGTERM to pid {self.popen.pid}...")
             os.killpg(os.getpgid(self.popen.pid), signal.SIGTERM)
 
             try:
-                self.info.returncode = self.popen.wait(timeout=0.5)
+                self.info.returncode = self.popen.wait(timeout=timeout)
 
             except subprocess.TimeoutExpired:
+                log.debug(f"Pid {self.popen.pid} unresponsive, sending SIGKILL...")
                 os.killpg(os.getpgid(self.popen.pid), signal.SIGKILL)
                 self.info.returncode = self.popen.wait()
 
@@ -285,7 +301,7 @@ class ProcessMonitor:
         self.poller = ProcessMonitor.Poller(log=log)
 
     def run_process(
-        self, cmd: str, sudo, cwd=None, env=None, timeout=None
+        self, cmd, sudo, cwd=None, env=None, timeout=None
     ) -> run_info.RunInfo:
         try:
             process = ProcessMonitor.Process(
@@ -313,7 +329,7 @@ class ProcessMonitor:
             raise
 
     def run_process_async(
-        self, cmd: str, sudo, daemon=False, cwd=None, env=None
+        self, cmd, sudo, daemon=False, cwd=None, env=None
     ) -> run_info.RunInfo:
         try:
             process = ProcessMonitor.Process(
@@ -374,29 +390,33 @@ class ProcessMonitor:
 
         return False
 
-    def stop_process_async(self, target: run_info.RunInfo):
+    def stop_process_async(self, target: run_info.RunInfo, timeout: float = 1.0):
         """Stop and remove a process managed by ProcessMonitor.
 
         :param target: The RunInfo object returned by `run_process_async`
             you want to stop.
+        :param timeout: Time in seconds to wait for SIGTERM to stop
+            the active process until SIGKILL is sent.
         """
         for daemon in self.daemons:
             if daemon.popen.pid == target.pid:
-                daemon.stop()
+                daemon.stop(timeout=timeout)
                 self.daemons.remove(daemon)
                 return
 
         for process in self.processes:
             if process.popen.pid == target.pid:
-                process.stop()
+                process.stop(timeout=timeout)
                 self.processes.remove(process)
                 return
 
         raise ValueError(f"Process with pid {target.pid!r} is not managed by {self!r}")
 
-    def stop(self, validate_state: bool = True):
+    def stop(self, validate_state: bool = True, timeout: int | float = 1.0):
         """Stop all processes
 
+        :param timeout: Time in seconds to wait for SIGTERM to stop
+            each active process until SIGKILL is sent.
         :param validate_state: If we should validate state before
             stopping all processes and daemons. Do not disable this
             unless you know what you are doing!
@@ -406,10 +426,10 @@ class ProcessMonitor:
             self._validate_state()
 
         for process in self.processes:
-            process.stop()
+            process.stop(timeout=timeout)
 
         for daemon in self.daemons:
-            daemon.stop()
+            daemon.stop(timeout=timeout)
 
         # Poll for output
         self.poller.poll(timeout=0.1)
