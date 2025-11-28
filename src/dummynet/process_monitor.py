@@ -301,7 +301,7 @@ class ProcessMonitor:
         self.poller = ProcessMonitor.Poller(log=log)
 
     def run_process(
-        self, cmd, sudo, cwd=None, env=None, timeout=None
+        self, cmd: str | list[str], sudo, cwd=None, env=None, timeout=None
     ) -> run_info.RunInfo:
         try:
             process = ProcessMonitor.Process(
@@ -329,7 +329,7 @@ class ProcessMonitor:
             raise
 
     def run_process_async(
-        self, cmd, sudo, daemon=False, cwd=None, env=None
+        self, cmd: str | list[str], sudo, daemon=False, cwd=None, env=None
     ) -> run_info.RunInfo:
         try:
             process = ProcessMonitor.Process(

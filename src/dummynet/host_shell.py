@@ -35,12 +35,12 @@ class HostShell(object):
         """
 
         if self.sudo:
-            cmd = self._add_sudo(cmd)
+            cmd = self._add_sudo_prefix(cmd)
 
         if env is None:
             env = os.environ.copy()
 
-        self.log.debug(cmd)
+        self.log.info(f"{cmd!r}")
 
         return self.process_monitor.run_process(
             cmd=cmd, sudo=self.sudo, cwd=cwd, env=env, timeout=timeout
@@ -89,7 +89,7 @@ class HostShell(object):
         """
 
         if self.sudo:
-            cmd = self._add_sudo(cmd)
+            cmd = self._add_sudo_prefix(cmd)
 
         if env is None:
             env = os.environ.copy()
@@ -100,8 +100,7 @@ class HostShell(object):
             cmd=cmd, sudo=self.sudo, daemon=daemon, cwd=cwd, env=env
         )
 
-    def _add_sudo(self, cmd: str | list[str]) -> str | list[str]:
-        """Prepends sudo with flags to a given command"""
+    def _add_sudo_prefix(self, cmd: str | list[str]) -> str | list[str]:
         sudo_prefix = ["sudo", "--reset-timestamp ", "--stdin", "--preserve-env"]
         if isinstance(cmd, str):
             return " ".join(sudo_prefix) + " " + cmd
