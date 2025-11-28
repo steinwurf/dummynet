@@ -5,7 +5,12 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Minor: Allow direct non-shell wrapped execution by using a list to the `cmd`
+  arguments in `ProcessMonitor.run_process_async`, `ProcessMonitor.run_process`,
+  `HostShell.run_async`, `HostShell.run`, `NamespaceShell.run_async` and
+  `NamespaceShell.run`.
+* Minor: Add optional `timeout` arguments to `ProcessMonitor.stop_process_async` and
+  `ProcessMonitor.stop`.
 
 9.1.0
 -----

@@ -641,9 +641,11 @@ def test_cleanup_daemon_death(shell: HostShell):
 def test_stop_process_async(process_monitor: ProcessMonitor):
     daemon = process_monitor.run_process_async("sleep 100", sudo=False, daemon=True)
     process_monitor.stop_process_async(daemon)
+    assert daemon.returncode is not None
 
     process = process_monitor.run_process_async("sleep 100", sudo=False, daemon=False)
     process_monitor.stop_process_async(process)
+    assert process.returncode is not None
 
     fake_process = RunInfo(
         cmd="echo",
@@ -658,3 +660,40 @@ def test_stop_process_async(process_monitor: ProcessMonitor):
     )
     with pytest.raises(ValueError):
         process_monitor.stop_process_async(fake_process)
+
+
+def test_stop_process_async_kill(process_monitor: ProcessMonitor):
+    # Clean exit will get returned correctly.
+    process = process_monitor.run_process_async(
+        """
+        trap 'exit 0' TERM
+        while :; do
+            sleep 10 &
+            wait $!
+        done
+        """,
+        sudo=False,
+        daemon=False,
+    )
+    process_monitor.stop_process_async(process)
+    assert process.returncode == 0
+
+    # Unclean SIGKILL from "hanging" process gets returned as -9 (SIGKILL).
+    process = process_monitor.run_process_async(
+        """
+        trap '' TERM
+        while :; do
+            sleep 10 &
+            wait $!
+        done
+        """,
+        sudo=False,
+        daemon=False,
+    )
+    process_monitor.stop_process_async(process)
+    assert signal.Signals(-process.returncode).name == "SIGKILL"  # type: ignore
+
+    # Daemon can also get killed and will respond to first -15 (SIGTERM) signal.
+    daemon = process_monitor.run_process_async("sleep 10", sudo=False, daemon=False)
+    process_monitor.stop_process_async(daemon)
+    assert signal.Signals(-daemon.returncode).name == "SIGTERM"  # type: ignore
