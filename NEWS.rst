@@ -5,7 +5,9 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Major: `update_sudo_password` will now throw `RuntimeError` early if given
+  sudo password is incorrect.
+* Patch: Fixed `update_sudo_password` to function with `pytest-xdist`.
 
 9.2.1
 -----
