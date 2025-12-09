@@ -1,5 +1,6 @@
+import subprocess4 as subprocess
+
 import fnmatch
-import subprocess
 from typing import Callable, Optional
 
 from . import errors
@@ -67,6 +68,10 @@ class RunInfo:
     @property
     def pid(self):
         return self.popen.pid
+
+    @property
+    def rusage(self):
+        return self.popen.rusage
 
     def match(self, stdout=None, stderr=None):
         """Matches the lines in the output with the pattern. The match

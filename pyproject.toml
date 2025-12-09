@@ -27,6 +27,7 @@ classifiers = [
 ]
 dependencies = [
     "psutil==7.0.0",
+    "subprocess4==0.1.1",
 ]
 
 [project.urls]

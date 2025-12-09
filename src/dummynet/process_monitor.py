@@ -1,10 +1,11 @@
 import select
 import logging
 import os
-import subprocess
 import signal
 import getpass
 import time
+
+import subprocess4 as subprocess
 
 from functools import lru_cache
 from typing import Optional
