@@ -1,8 +1,11 @@
 from dummynet.dummy_net import DummyNet
 from dummynet.host_shell import HostShell
-from dummynet.process_monitor import ProcessMonitor, sudo_requires_password
+from dummynet.process_monitor import (
+    ProcessMonitor,
+    sudo_requires_password,
+    update_sudo_password,
+)
 import dummynet
-from getpass import getpass
 from typing import Generator
 import pytest
 import logging
@@ -13,7 +16,7 @@ def pytest_configure(config):
     # Set root password once on xdist master.
     worker_id = os.environ.get("PYTEST_XDIST_WORKER")
     if worker_id is None and sudo_requires_password():
-        os.environ["DUMMYNET_SUDO_PASSWD"] = getpass("[sudo] password for root: ")
+        update_sudo_password()
 
 
 @pytest.fixture
