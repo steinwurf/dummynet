@@ -647,12 +647,17 @@ def test_stop_process_async(process_monitor: ProcessMonitor):
     process_monitor.stop_process_async(process)
     assert process.returncode is not None
 
+    class FakePopen:
+        @property
+        def pid(self):
+            return None
+
     fake_process = RunInfo(
         cmd="echo",
         cwd=None,
-        pid=None,
-        stdout=None,
-        stderr=None,
+        popen=FakePopen(),
+        stdout="",
+        stderr="",
         returncode=None,
         is_async=False,
         is_daemon=False,

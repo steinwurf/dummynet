@@ -1,6 +1,5 @@
-import subprocess4 as subprocess
-
 import fnmatch
+import subprocess
 from typing import Callable, Optional
 
 from . import errors

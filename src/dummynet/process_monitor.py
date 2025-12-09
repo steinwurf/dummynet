@@ -5,7 +5,8 @@ import signal
 import getpass
 import time
 
-import subprocess4 as subprocess
+from subprocess4 import Popen as Popen4
+import subprocess
 
 from functools import lru_cache
 from typing import Optional
@@ -193,7 +194,7 @@ class ProcessMonitor:
             # Run inside wrapped /bin/sh environment when cmd is string.
             shell = isinstance(cmd, str)
 
-            self.popen = subprocess.Popen(
+            self.popen = Popen4(
                 cmd,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
