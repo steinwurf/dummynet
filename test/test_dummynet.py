@@ -708,7 +708,8 @@ def test_cpu_usage_statistics(process_monitor: ProcessMonitor):
 
         # Allow a 5% margin of the given utime value
         margin = utime * 0.05
-        assert (utime - margin) <= process.rusage.ru_utime <= (utime + margin)
+        actual_utime = process.rusage.ru_utime  # type: ignore
+        assert (utime - margin) < actual_utime < (utime + margin)
 
     run_task_async("stress --cpu 1 --timeout 1", sudo=False, utime=1.0)
     run_task_async(["stress", "--cpu", "2", "--timeout", "1"], sudo=False, utime=2.0)
