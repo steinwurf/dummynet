@@ -10,7 +10,7 @@ import re
 
 top = "."
 
-VERSION = "9.2.1"
+VERSION = "10.0.0"
 
 
 class UploadContext(BuildContext):
