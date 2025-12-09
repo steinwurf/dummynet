@@ -85,7 +85,11 @@ def update_sudo_password():
         prompt = f"\n[sudo] password for {getpass.getuser()}: "
         cached_sudo_password = getpass.getpass(prompt=prompt) + "\n"
 
+    # Raise early if password is incorrect
     check_sudo_password(cached_sudo_password)
+
+    # Ensure pytest-xdist workers can also access the password
+    os.environ["DUMMYNET_SUDO_PASSWD"] = cached_sudo_password
 
 
 class ProcessMonitor:
