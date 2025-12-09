@@ -1,10 +1,12 @@
 import select
 import logging
 import os
-import subprocess
 import signal
 import getpass
 import time
+
+from subprocess4 import Popen as Popen4
+import subprocess
 
 from functools import lru_cache
 from typing import Optional
@@ -192,7 +194,7 @@ class ProcessMonitor:
             # Run inside wrapped /bin/sh environment when cmd is string.
             shell = isinstance(cmd, str)
 
-            self.popen = subprocess.Popen(
+            self.popen = Popen4(
                 cmd,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
@@ -210,16 +212,14 @@ class ProcessMonitor:
 
             # Pipe possible sudo password to the process
             if sudo and (cached_sudo_password is not None):
-                assert cached_sudo_password.endswith(
-                    "\n"
-                )  # Ensure the password ends with a newline as otherwise sudo will hang
+                assert cached_sudo_password.endswith("\n")
                 self.popen.stdin.write(cached_sudo_password)
                 self.popen.stdin.flush()
 
             self.info = run_info.RunInfo(
                 cmd=cmd,
                 cwd=cwd,
-                pid=self.popen.pid,
+                popen=self.popen,
                 stdout="",
                 stderr="",
                 returncode=None,

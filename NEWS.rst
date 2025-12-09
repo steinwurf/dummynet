@@ -5,7 +5,9 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Major: `RunInfo` now takes a `subprocess.Popen` object instead of a `pid`.
+  `RunInfo.pid` is still accessible and points to `RunInfo.popen.pid` for
+  backwards compatability.
 
 10.0.0
 ------

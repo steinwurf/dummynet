@@ -647,12 +647,17 @@ def test_stop_process_async(process_monitor: ProcessMonitor):
     process_monitor.stop_process_async(process)
     assert process.returncode is not None
 
+    class FakePopen:
+        @property
+        def pid(self):
+            return None
+
     fake_process = RunInfo(
         cmd="echo",
         cwd=None,
-        pid=None,
-        stdout=None,
-        stderr=None,
+        popen=FakePopen(),
+        stdout="",
+        stderr="",
         returncode=None,
         is_async=False,
         is_daemon=False,
@@ -697,3 +702,21 @@ def test_stop_process_async_kill(process_monitor: ProcessMonitor):
     daemon = process_monitor.run_process_async("sleep 10", sudo=False, daemon=False)
     process_monitor.stop_process_async(daemon)
     assert signal.Signals(-daemon.returncode).name == "SIGTERM"  # type: ignore
+
+
+def test_cpu_usage_statistics(process_monitor: ProcessMonitor):
+    def run_task_async(task, sudo, utime):
+        process = process_monitor.run_process_async(task, sudo=sudo)
+
+        while process_monitor.keep_running():
+            pass
+
+        # Allow a 5% margin of the given utime value
+        margin = utime * 0.05
+        actual_utime = process.rusage.ru_utime  # type: ignore
+        assert (utime - margin) < actual_utime < (utime + margin)
+
+    run_task_async("stress --cpu 1 --timeout 1", sudo=False, utime=1.0)
+    run_task_async(["stress", "--cpu", "2", "--timeout", "1"], sudo=False, utime=2.0)
+    run_task_async("stress --cpu 1 --timeout 2", sudo=True, utime=2.0)
+    run_task_async(["stress", "--cpu", "2", "--timeout", "2"], sudo=True, utime=4.0)

@@ -28,7 +28,7 @@ jobs:
         --cgroupns host
     steps:
       - name: Install dependencies
-        run: apt update && apt install -y sudo iproute2 iputils-ping
+        run: apt update && apt install -y sudo iproute2 iputils-ping stress
       - name: Checkout
         uses: actions/checkout@v4
       - name: Configure
