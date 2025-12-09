@@ -10,7 +10,6 @@ from functools import lru_cache
 from typing import Optional
 
 from . import errors
-from . import process
 from . import run_info
 
 # The cached sudo password
@@ -42,6 +41,28 @@ def sudo_requires_password() -> bool:
         return False  # Assume if we have no sudo, we have no password to feed.
 
 
+def check_sudo_password(password: str):
+    process = None
+    try:
+        process = subprocess.Popen(
+            ["sudo", "--reset-timestamp", "--stdin", "true"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        _, stderr = process.communicate(input=password, timeout=0.5)
+
+        if process.returncode != 0:
+            raise RuntimeError(f"Sudo threw an error: {stderr!r}")
+    except subprocess.TimeoutExpired:
+        if process is not None:
+            process.kill()
+        raise RuntimeError("Sudo password was incorrect!")
+    except Exception as e:
+        raise RuntimeError(f"Error when checking sudo password: {e}")
+
+
 def update_sudo_password():
     """Cache the sudo password"""
 
@@ -60,11 +81,15 @@ def update_sudo_password():
         # Environment variable was set, use it instead of asking for a password
         if not cached_sudo_password.endswith("\n"):
             cached_sudo_password += "\n"
-        return
+    else:
+        prompt = f"\n[sudo] password for {getpass.getuser()}: "
+        cached_sudo_password = getpass.getpass(prompt=prompt) + "\n"
 
-    prompt = f"\n[sudo] password for {getpass.getuser()}: "
+    # Raise early if password is incorrect
+    check_sudo_password(cached_sudo_password)
 
-    cached_sudo_password = getpass.getpass(prompt=prompt) + "\n"
+    # Ensure pytest-xdist workers can also access the password
+    os.environ["DUMMYNET_SUDO_PASSWD"] = cached_sudo_password
 
 
 class ProcessMonitor:
