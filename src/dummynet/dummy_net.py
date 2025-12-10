@@ -1,23 +1,17 @@
-import re
 import json
-from subprocess import CalledProcessError
-from typing import Callable, NamedTuple, Optional, Self, List
-from logging import Logger
-
+import re
 from collections import OrderedDict
 from dataclasses import dataclass, field
+from logging import Logger
+from subprocess import CalledProcessError
+from typing import Callable, List, NamedTuple, Optional, Self
 
 from dummynet import errors
 from dummynet.cgroups import CGroup
-from dummynet.namespace_shell import NamespaceShell
 from dummynet.host_shell import HostShell
+from dummynet.namespace_shell import NamespaceShell
 from dummynet.run_info import RunInfo
-from dummynet.scoped import (
-    CGroupScoped,
-    NamespaceScoped,
-    InterfaceScoped,
-    Scoped,
-)
+from dummynet.scoped import CGroupScoped, InterfaceScoped, NamespaceScoped, Scoped
 
 ShellType = NamespaceShell | HostShell
 
@@ -495,7 +489,8 @@ class DummyNet:
                 namespace = NamespaceScoped.from_scoped(name)
                 if namespace.uid == self.namespace.uid:
                     namespaces.append(namespace)
-            except ValueError:
+            except ValueError as e:
+                self.shell.log.debug(f"Skipping invalid namespace line {line!r}: {e}")
                 continue
 
         return namespaces
