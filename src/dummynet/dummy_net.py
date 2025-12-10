@@ -577,6 +577,26 @@ class DummyNet:
 
         return dnet
 
+    def netns_use(self, name: str) -> Self:
+        """Uses an existing network namespace.
+
+        Returns a new DummyNet object with a NamespaceShell, a wrapper to the
+        command-line but with every command prefixed by 'ip netns exec name'
+        This returned object is the main component for creating a dummy-network.
+        Configuring these namespaces with the other utility commands allows you
+        """
+        namespace = NamespaceScoped(name=name, uid=self.namespace.uid)
+
+        if namespace not in self.netns_list():
+            raise ValueError(f"No such namespace: {namespace!r}")
+
+        ns_shell = NamespaceShell(name=namespace.scoped, shell=self.shell)
+        dnet = self.__class__(
+            shell=ns_shell, namespace=namespace, cleaners=self.cleaners
+        )
+
+        return dnet
+
     def bridge_add(self, name: str) -> InterfaceScoped:
         """Adds a bridge"""
         bridge = InterfaceScoped(name=name, uid=self.namespace.uid)

@@ -5,7 +5,8 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Minor: Added netns_use to allow an existing namespace to be used instead of
+  creating a new one.
 
 10.0.0
 ------
