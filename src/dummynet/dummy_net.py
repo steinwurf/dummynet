@@ -486,7 +486,7 @@ class DummyNet:
             try:
                 # The name is the first word followed by a space
                 name = line.split(" ")[0]
-                namespace = NamespaceScoped.from_scoped(name)
+                namespace = NamespaceScoped.from_any(name)
                 if namespace.uid == self.namespace.uid:
                     namespaces.append(namespace)
             except ValueError as e:
