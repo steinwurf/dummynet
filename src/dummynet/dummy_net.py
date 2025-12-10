@@ -1,23 +1,17 @@
-import re
 import json
-from subprocess import CalledProcessError
-from typing import Callable, NamedTuple, Optional, Self, List
-from logging import Logger
-
+import re
 from collections import OrderedDict
 from dataclasses import dataclass, field
+from logging import Logger
+from subprocess import CalledProcessError
+from typing import Callable, List, NamedTuple, Optional, Self
 
 from dummynet import errors
 from dummynet.cgroups import CGroup
-from dummynet.namespace_shell import NamespaceShell
 from dummynet.host_shell import HostShell
+from dummynet.namespace_shell import NamespaceShell
 from dummynet.run_info import RunInfo
-from dummynet.scoped import (
-    CGroupScoped,
-    NamespaceScoped,
-    InterfaceScoped,
-    Scoped,
-)
+from dummynet.scoped import CGroupScoped, InterfaceScoped, NamespaceScoped, Scoped
 
 ShellType = NamespaceShell | HostShell
 
@@ -492,10 +486,11 @@ class DummyNet:
             try:
                 # The name is the first word followed by a space
                 name = line.split(" ")[0]
-                namespace = NamespaceScoped.from_scoped(name)
+                namespace = NamespaceScoped.from_any(name)
                 if namespace.uid == self.namespace.uid:
                     namespaces.append(namespace)
-            except ValueError:
+            except ValueError as e:
+                self.shell.log.debug(f"Skipping invalid namespace line {line!r}: {e}")
                 continue
 
         return namespaces
@@ -573,6 +568,28 @@ class DummyNet:
 
         self.cleaners.append(
             CleanupItem(namespace, InterfaceScoped(name="1"), "netns_add", cleaner)
+        )
+
+        return dnet
+
+    def netns_use(self, name: str) -> Self:
+        """Uses an existing network namespace.
+
+        Returns a new DummyNet object with a NamespaceShell, a wrapper to the
+        command-line but with every command prefixed by 'ip netns exec name'
+        This returned object is the main component for creating a dummy-network.
+        Configuring these namespaces with the other utility commands allows you
+        """
+        namespace = NamespaceScoped(name=name, uid=self.namespace.uid)
+
+        if namespace.name not in [ns.name for ns in self.netns_list()]:
+            raise ValueError(
+                f"No such namespace: {namespace!r} list is {self.netns_list()!r}"
+            )
+
+        ns_shell = NamespaceShell(name=namespace.scoped, shell=self.shell)
+        dnet = self.__class__(
+            shell=ns_shell, namespace=namespace, cleaners=self.cleaners
         )
 
         return dnet
