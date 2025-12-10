@@ -587,7 +587,7 @@ class DummyNet:
         """
         namespace = NamespaceScoped(name=name, uid=self.namespace.uid)
 
-        if namespace not in self.netns_list():
+        if namespace.name not in self.netns_list():
             raise ValueError(f"No such namespace: {namespace!r}")
 
         ns_shell = NamespaceShell(name=namespace.scoped, shell=self.shell)
