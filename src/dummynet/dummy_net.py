@@ -582,7 +582,7 @@ class DummyNet:
         """
         namespace = NamespaceScoped(name=name, uid=self.namespace.uid)
 
-        if namespace.name not in self.netns_list():
+        if namespace.name not in [ns.name for ns in self.netns_list()]:
             raise ValueError(
                 f"No such namespace: {namespace!r} list is {self.netns_list()!r}"
             )
