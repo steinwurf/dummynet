@@ -711,8 +711,8 @@ def test_cpu_usage_statistics(process_monitor: ProcessMonitor):
         while process_monitor.keep_running():
             pass
 
-        # Allow a 5% margin of the given utime value
-        margin = utime * 0.05
+        # Allow a 5% (+-2.5%) margin of the given utime value
+        margin = utime * 0.025
         actual_utime = process.rusage.ru_utime  # type: ignore
         assert (utime - margin) < actual_utime < (utime + margin)
 

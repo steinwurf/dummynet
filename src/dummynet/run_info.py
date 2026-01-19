@@ -145,8 +145,8 @@ class RunInfo:
                 else ""
             )
             + (f" timeout: {self.timeout!r} " if self.timeout is not None else "")
-            + (f" stdout: {len(self.stdout)} chars" if self.stdout else "")
-            + (f" stderr: {len(self.stderr)} chars" if self.stderr else "")
+            + (f" stdout: {self.stdout!r}" if self.stdout else "")
+            + (f" stderr: {self.stderr!r}" if self.stderr else "")
             + (f" modes: {modes!r}" if modes else "")
             + ">"
         )
