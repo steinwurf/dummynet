@@ -196,7 +196,7 @@ class ProcessMonitor:
             # Run inside wrapped /bin/sh environment when cmd is string.
             shell = isinstance(cmd, str)
 
-            self.popen = psutil.Popen(
+            self.popen = subprocess.Popen(
                 cmd,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
@@ -261,7 +261,8 @@ class ProcessMonitor:
                 time.sleep(0.05)
             else:
                 try:
-                    self.info.returncode = self.popen.wait(timeout=self.info.timeout)
+                    wait_for_zombie(popen=self.popen, timeout=self.info.timeout)
+                    self.poll()
 
                     poller.wait_fd(self.popen.stdout.fileno())
                     poller.wait_fd(self.popen.stderr.fileno())
@@ -285,13 +286,14 @@ class ProcessMonitor:
         def poll(self) -> Optional[int]:
             if self.info.returncode is not None:
                 return self.info.returncode
+            popen = psutil.Process(self.popen.pid)
 
             total_system, total_user, total_rss, total_vms = 0.0, 0.0, 0, 0
             processes_lost = 0
 
             # NOTE: Parent process polled first to always undercount if children exit during
             # metrics collection.
-            for process in chain([self.popen], self.popen.children(recursive=True)):
+            for process in chain([popen], popen.children(recursive=True)):
                 try:
                     cpu_times = process.cpu_times()
                     memory_info = process.memory_info()
@@ -330,7 +332,6 @@ class ProcessMonitor:
 
         def stop(self, timeout: float = 1.0):
             """Stop a process"""
-
             self.poll()
 
             if self.info.returncode is not None:
@@ -341,11 +342,11 @@ class ProcessMonitor:
                 log.info(f"Sending SIGTERM to pid {self.popen.pid}...")
                 os.killpg(os.getpgid(self.popen.pid), signal.SIGTERM)
                 wait_for_zombie(popen=self.popen, timeout=timeout)
+                self.poll()
             except subprocess.TimeoutExpired:
                 log.warning(f"Pid {self.popen.pid} unresponsive, sending SIGKILL...")
                 os.killpg(os.getpgid(self.popen.pid), signal.SIGKILL)
                 wait_for_zombie(popen=self.popen)
-            finally:
                 self.poll()
 
     def __init__(self, log):
@@ -441,10 +442,10 @@ class ProcessMonitor:
         if not self.processes and self.daemons:
             raise errors.NoProcessesError()
 
+        self._validate_state()
+
         # Poll for output
         self.poller.poll(timeout)
-
-        self._validate_state()
 
         # Check if there are any non-daemon processes running
         for process in self.processes:

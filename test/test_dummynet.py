@@ -254,12 +254,14 @@ def test_link_vlan_isolation(process_monitor: ProcessMonitor, net: DummyNet):
     demo1.up("lo")
 
     # Try to ping - should fail because VLANs are different
-    proc0 = demo0.run_async(cmd=r"""
+    proc0 = demo0.run_async(
+        cmd=r"""
         ping -c 3 -W 1 10.0.0.2; \
         if [ "$?" -ne 1 ]; then \
             exit 1; \
         fi
-        """)
+        """
+    )
 
     def _proc0_stdout(data):
         print("demo0 (VLAN 100 -> VLAN 200): {}".format(data))
@@ -313,12 +315,14 @@ def test_addr_del_with_ping(process_monitor: ProcessMonitor, net: DummyNet):
     demo1.addr_del(ip="10.0.0.2/24", interface=demo1_veth0)
 
     # Second ping should fail
-    proc1 = demo0.run_async(cmd=r"""
+    proc1 = demo0.run_async(
+        cmd=r"""
         ping -c 3 -W 1 10.0.0.2; \
         if [ "$?" -ne 1 ]; then \
             exit 1; \
         fi
-        """)
+        """
+    )
 
     def _proc1_stdout(data):
         print("demo0 (after addr_del): {}".format(data))
@@ -643,15 +647,10 @@ def test_stop_process_async(process_monitor: ProcessMonitor):
     process_monitor.stop_process_async(process)
     assert process.returncode is not None
 
-    class FakePopen:
-        @property
-        def pid(self):
-            return None
-
     fake_process = RunInfo(
         cmd="echo",
         cwd=None,
-        popen=FakePopen(),
+        pid=0,
         stdout="",
         stderr="",
         returncode=None,
@@ -709,7 +708,7 @@ def test_cpu_usage_statistics(process_monitor: ProcessMonitor):
 
         # Allow a 5% (+-2.5%) margin of the given utime value
         margin = utime * 0.025
-        actual_utime = process.rusage.ru_utime  # type: ignore
+        actual_utime = process.cpu_user
         assert (utime - margin) < actual_utime < (utime + margin)
 
     run_task_async("stress --cpu 1 --timeout 1", sudo=False, utime=1.0)

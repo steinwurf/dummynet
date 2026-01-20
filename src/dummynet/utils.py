@@ -6,7 +6,7 @@ import psutil
 
 
 def wait_for_zombie(
-    popen: subprocess.Popen | psutil.Popen, timeout: Optional[float] = None
+    popen: subprocess.Popen, timeout: Optional[float] = None
 ) -> Optional[int]:
     """
     Waits for a subprocess.Popen or psutil.Popen object to reach zombie status.
