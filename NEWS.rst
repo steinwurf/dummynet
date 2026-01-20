@@ -5,7 +5,7 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Patch: Update dependency `psutil` from version `7.0.0` to version `7.2.1`.
 
 10.1.0
 ------
