@@ -27,7 +27,21 @@ class RunInfo:
     """
 
     def __init__(
-        self, cmd, cwd, pid, stdout, stderr, returncode, is_async, is_daemon, timeout
+        self,
+        cmd,
+        cwd,
+        pid,
+        stdout,
+        stderr,
+        returncode,
+        is_async,
+        is_daemon,
+        timeout,
+        *,
+        cpu_system=0.0,
+        cpu_user=0.0,
+        mem_rss=0,
+        mem_vms=0,
     ):
         """Create a new object
 
@@ -53,6 +67,15 @@ class RunInfo:
         self.stdout_callback: Optional[Callable] = None
         self.stderr_callback: Optional[Callable] = None
         self.timeout: Optional[int | float] = timeout
+        # TODO: Refactor into its own class.
+        self.cpu_system: float = cpu_system
+        self.cpu_user: float = cpu_user
+        self.mem_rss: int = mem_rss
+        self.mem_vms: int = mem_vms
+
+    @property
+    def cpu_total(self) -> float:
+        return self.cpu_system + self.cpu_user
 
     def match(self, stdout=None, stderr=None):
         """Matches the lines in the output with the pattern. The match
@@ -108,29 +131,32 @@ class RunInfo:
                 pattern=pattern, stream_name=stream_name, output=output
             )
 
-    def __str__(self):
-        """Print the RunInfo object as a string"""
-        run_string = (
-            "RunInfo\n"
-            "command: {command}\n"
-            "cwd: {cwd}\n"
-            "pid: {pid}\n"
-            "returncode: {returncode}\n"
-            "stdout: \n{stdout}"
-            "stderr: \n{stderr}"
-            "is_async: {is_async}\n"
-            "is_daemon: {is_daemon}\n"
-            "timeout: {timeout}\n"
+    def __repr__(self):
+        """Return a detailed representation of the object for debugging"""
+        modes = []
+
+        if self.is_async:
+            modes.append("async")
+        if self.is_daemon:
+            modes.append("daemon")
+
+        return (
+            f"<{self.__class__.__name__}:"
+            + f" pid: {self.pid!r}"
+            + f" cmd: {self.cmd!r}"
+            + (f" cwd: {self.cwd!r}" if self.cwd is not None else "")
+            + (
+                f" returncode: {self.returncode!r}"
+                if self.returncode is not None
+                else ""
+            )
+            + (f" timeout: {self.timeout!r} " if self.timeout is not None else "")
+            + (f" stdout: {self.stdout!r}" if self.stdout else "")
+            + (f" stderr: {self.stderr!r}" if self.stderr else "")
+            + (f" modes: {modes!r}" if modes else "")
+            + ">"
         )
 
-        return run_string.format(
-            command=self.cmd,
-            cwd=self.cwd,
-            pid=self.pid,
-            returncode=self.returncode,
-            stdout=self.stdout,
-            stderr=self.stderr,
-            is_async=self.is_async,
-            is_daemon=self.is_daemon,
-            timeout=self.timeout,
-        )
+    def __str__(self):
+        """Print the RunInfo object as a string"""
+        return self.__repr__()
