@@ -263,6 +263,7 @@ class ProcessMonitor:
                 try:
                     wait_for_zombie(popen=self.popen, timeout=self.info.timeout)
                     self.poll()
+                    assert self.info.returncode is not None
 
                     poller.wait_fd(self.popen.stdout.fileno())
                     poller.wait_fd(self.popen.stderr.fileno())
@@ -343,11 +344,13 @@ class ProcessMonitor:
                 os.killpg(os.getpgid(self.popen.pid), signal.SIGTERM)
                 wait_for_zombie(popen=self.popen, timeout=timeout)
                 self.poll()
+                assert self.info.returncode is not None
             except subprocess.TimeoutExpired:
                 log.warning(f"Pid {self.popen.pid} unresponsive, sending SIGKILL...")
                 os.killpg(os.getpgid(self.popen.pid), signal.SIGKILL)
                 wait_for_zombie(popen=self.popen)
                 self.poll()
+                assert self.info.returncode is not None
 
     def __init__(self, log):
         """Create a new test monitor"""
