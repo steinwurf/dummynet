@@ -4,15 +4,17 @@ import os
 import signal
 import getpass
 import time
-
-from subprocess4 import Popen as Popen4
 import subprocess
 
+import psutil
+
 from functools import lru_cache
+from itertools import chain
 from typing import Optional
 
 from . import errors
 from . import run_info
+from .utils import wait_for_zombie
 
 # The cached sudo password
 cached_sudo_password: Optional[str] = None
@@ -194,7 +196,7 @@ class ProcessMonitor:
             # Run inside wrapped /bin/sh environment when cmd is string.
             shell = isinstance(cmd, str)
 
-            self.popen = Popen4(
+            self.popen = psutil.Popen(
                 cmd,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
@@ -219,7 +221,7 @@ class ProcessMonitor:
             self.info = run_info.RunInfo(
                 cmd=cmd,
                 cwd=cwd,
-                popen=self.popen,
+                pid=self.popen.pid,
                 stdout="",
                 stderr="",
                 returncode=None,
@@ -280,35 +282,71 @@ class ProcessMonitor:
 
                     raise errors.TimeoutError(info=self.info)
 
-        def is_running(self):
-            """Poll the process and update the return code"""
-
+        def poll(self) -> Optional[int]:
             if self.info.returncode is not None:
-                return True
+                return self.info.returncode
+
+            total_system, total_user, total_rss, total_vms = 0.0, 0.0, 0, 0
+            processes_lost = 0
+
+            # NOTE: Parent process polled first to always undercount if children exit during
+            # metrics collection.
+            for process in chain([self.popen], self.popen.children(recursive=True)):
+                try:
+                    cpu_times = process.cpu_times()
+                    memory_info = process.memory_info()
+
+                    total_system += cpu_times.system + cpu_times.children_system
+                    total_user += cpu_times.user + cpu_times.children_user
+                    total_rss += memory_info.rss
+                    total_vms += memory_info.vms
+                except psutil.NoSuchProcess:
+                    processes_lost += 1
+                    if process.pid == self.popen.pid:
+                        log.warning(
+                            f"Main process {self.popen.pid} terminated during polling?"
+                        )
+                    continue
+            if processes_lost > 0:
+                log.warning(
+                    f"Partial stats for pid={self.popen.pid}: {processes_lost} child process(es) "
+                    f"terminated during polling and were excluded from totals."
+                )
+
+            self.info.cpu_system = total_system
+            self.info.cpu_user = total_user
+            self.info.mem_rss = total_rss
+            self.info.mem_vms = total_vms
 
             self.info.returncode = self.popen.poll()
+
+            return self.info.returncode
+
+        def is_running(self) -> bool:
+            """Poll the process to possibly update return code"""
+            self.poll()
 
             return self.info.returncode is None
 
         def stop(self, timeout: float = 1.0):
             """Stop a process"""
 
-            self.info.returncode = self.popen.poll()
+            self.poll()
 
             if self.info.returncode is not None:
                 return
 
-            # See start_new_sesstion in __init__ for why we use os.killpg
-            log.debug(f"Sending SIGTERM to pid {self.popen.pid}...")
-            os.killpg(os.getpgid(self.popen.pid), signal.SIGTERM)
-
             try:
-                self.info.returncode = self.popen.wait(timeout=timeout)
-
+                # See start_new_sesstion in __init__ for why we use os.killpg
+                log.info(f"Sending SIGTERM to pid {self.popen.pid}...")
+                os.killpg(os.getpgid(self.popen.pid), signal.SIGTERM)
+                wait_for_zombie(popen=self.popen, timeout=timeout)
             except subprocess.TimeoutExpired:
-                log.debug(f"Pid {self.popen.pid} unresponsive, sending SIGKILL...")
+                log.warning(f"Pid {self.popen.pid} unresponsive, sending SIGKILL...")
                 os.killpg(os.getpgid(self.popen.pid), signal.SIGKILL)
-                self.info.returncode = self.popen.wait()
+                wait_for_zombie(popen=self.popen)
+            finally:
+                self.poll()
 
     def __init__(self, log):
         """Create a new test monitor"""
