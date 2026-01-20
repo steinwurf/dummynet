@@ -5,9 +5,15 @@ every change, see the Git log.
 
 Latest
 ------
-* Major: `RunInfo` now takes a `subprocess.Popen` object instead of a `pid`.
-  `RunInfo.pid` is still accessible and points to `RunInfo.popen.pid` for
-  backwards compatability.
+* Minor: `RunInfo` now takes the optional arguments `cpu_system`, `cpu_user`,
+  `mem_rss`, `mem_vms`. The same arguments are also properties of `RunInfo`,
+  together with the helper `cpu_total` property.
+* Minor: `RunInfo` repr and string representation changed to be more concise
+  and easy to read.
+* Minor: New feature with incremental CPU and Memory Usage statistics added
+  to `RunInfo` after each sync from `process_monitor.keep_running` and
+  `process.is_running` calls.
+* Patch: Fixed extra newline printed before sudo request.
 
 10.0.0
 ------
