@@ -5,6 +5,10 @@ every change, see the Git log.
 
 Latest
 ------
+* tbd
+
+10.1.0
+------
 * Minor: `RunInfo` now takes the optional arguments `cpu_system`, `cpu_user`,
   `mem_rss`, `mem_vms`. The same arguments are also properties of `RunInfo`,
   together with the helper `cpu_total` property.
