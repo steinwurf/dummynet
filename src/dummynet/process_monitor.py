@@ -86,7 +86,7 @@ def update_sudo_password():
         if not cached_sudo_password.endswith("\n"):
             cached_sudo_password += "\n"
     else:
-        prompt = f"\n[sudo] password for {getpass.getuser()}: "
+        prompt = f"[sudo] password for {getpass.getuser()}: "
         cached_sudo_password = getpass.getpass(prompt=prompt) + "\n"
 
     # Raise early if password is incorrect
