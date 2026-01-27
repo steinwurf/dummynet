@@ -21,7 +21,9 @@ class UploadContext(BuildContext):
 def options(opt):
     gr = opt.get_option_group("Build and installation options")
 
-    gr.add_option("--run_tests", default=False, action="store_true", help="Run all unit tests")
+    gr.add_option(
+        "--run_tests", default=False, action="store_true", help="Run all unit tests"
+    )
 
     gr.add_option(
         "--filter",
@@ -83,17 +85,6 @@ def _find_wheel(ctx):
     wheel = wheel[0]
     Logs.info("Wheel %s", wheel)
     return wheel
-
-
-def upload(bld):
-    """Upload the built wheel to PyPI (the Python Package Index)"""
-
-    with bld.create_virtualenv() as venv:
-        venv.run("python -m pip install twine")
-
-        wheel = _find_wheel(ctx=bld)
-
-        venv.run(f"python -m twine upload {wheel}")
 
 
 def prepare_release(ctx):
