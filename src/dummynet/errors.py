@@ -9,15 +9,36 @@ class RunInfoError(DummyNetError):
     """Exception for run result errors"""
 
     def __init__(self, info):
-        super().__init__(str(info))
+        super().__init__(message="runinfo error")
+
+        # We wait with stringifying the info until needed since polling stdout
+        # and stderr still happen after the exception is created. We maybe
+        # should do this differently but for now this works. Alternatively we
+        # could capture the output at the time of exception creation e.g. in
+        # the process monitor.
         self.info = info
+
+    def __str__(self):
+        return str(self.info)
+
+    def __repr__(self):
+        return f"RunInfoError({repr(self.info)})"
 
 
 class TimeoutError(DummyNetError):
     """Exception for timeout errors"""
 
     def __init__(self, info):
-        super().__init__(str(info))
+        super().__init__(message="timeout error")
+
+        # See RunInfoError for explanation
+        self.info = info
+
+    def __str__(self):
+        return str(self.info)
+
+    def __repr__(self):
+        return f"TimeoutError({repr(self.info)})"
 
 
 class MatchError(DummyNetError):

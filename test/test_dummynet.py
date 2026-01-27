@@ -721,3 +721,30 @@ def test_cpu_usage_statistics(process_monitor: ProcessMonitor):
     run_task_async(["stress", "--cpu", "2", "--timeout", "1"], sudo=False, utime=2.0)
     run_task_async("stress --cpu 1 --timeout 2", sudo=True, utime=2.0)
     run_task_async(["stress", "--cpu", "2", "--timeout", "2"], sudo=True, utime=4.0)
+
+
+def test_netns_use(net: DummyNet):
+    """Test that netns_use can access an existing namespace"""
+    # Create a namespace using netns_add
+    demo0 = net.netns_add("demo0")
+
+    # Create a veth pair in the namespace
+    veth0, veth1 = demo0.link_veth_add("veth0", "veth1")
+    demo0.addr_add("10.0.0.1/24", veth0)
+    demo0.up(veth0)
+
+    # Use netns_use to get another reference to the same namespace
+    demo0_ref = net.netns_use("demo0")
+
+    # Verify we can interact with the namespace through the new reference
+    links = demo0_ref.link_list()
+    assert veth0 in links
+    assert veth1 in links
+
+    # Verify we can run commands in the namespace
+    out = demo0_ref.run(f"ip addr show dev {veth0}")
+    assert "10.0.0.1/24" in out.stdout
+
+    # Verify that trying to use a non-existent namespace raises an error
+    with pytest.raises(ValueError, match="No such namespace"):
+        net.netns_use("nonexistent")
