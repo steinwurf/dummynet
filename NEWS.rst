@@ -5,6 +5,10 @@ every change, see the Git log.
 
 Latest
 ------
+* tbd
+
+10.2.0
+------
 * Minor: Added netns_use to allow an existing namespace to be used instead of
   creating a new one.
 * Patch: Update dependency `psutil` from version `7.0.0` to version `7.2.1`.
