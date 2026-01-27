@@ -237,6 +237,7 @@ class ProcessMonitor:
                     self.info.stdout_callback(data)
 
             def stderr_callback(data):
+                print(f"Process stderr: {data}", flush=True)
                 if self.info.stderr is None:
                     self.info.stderr = data
                 else:
@@ -425,7 +426,7 @@ class ProcessMonitor:
             # Re-raise the exception to make sure the caller knows
             raise
 
-    def keep_running(self, timeout=0.1):
+    def keep_running(self, timeout=0.2):
         """Run the process monitor.
 
         :param timeout: A timeout in milliseconds. If this timeout
@@ -447,13 +448,13 @@ class ProcessMonitor:
 
         self._validate_state()
 
-        # Poll for output
-        self.poller.poll(timeout)
-
         # Check if there are any non-daemon processes running
         for process in self.processes:
             if process.info.returncode is None:
                 return True
+
+        # Poll for output
+        self.poller.poll(timeout=timeout)
 
         return False
 
@@ -520,4 +521,9 @@ class ProcessMonitor:
                 exceptions.append(errors.DaemonExitError(info=daemon.info))
 
         if exceptions:
+
+            # Poll for output to capture as much context as possible before
+            # raising the exception - we poll with a quite long timeout here
+            self.poller.poll(timeout=0.5)
+
             raise ExceptionGroup("Invalid state", exceptions)
