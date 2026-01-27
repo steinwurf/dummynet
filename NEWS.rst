@@ -7,6 +7,19 @@ Latest
 ------
 * Minor: Added netns_use to allow an existing namespace to be used instead of
   creating a new one.
+* Patch: Update dependency `psutil` from version `7.0.0` to version `7.2.1`.
+
+10.1.0
+------
+* Minor: `RunInfo` now takes the optional arguments `cpu_system`, `cpu_user`,
+  `mem_rss`, `mem_vms`. The same arguments are also properties of `RunInfo`,
+  together with the helper `cpu_total` property.
+* Minor: `RunInfo` repr and string representation changed to be more concise
+  and easy to read.
+* Minor: New feature with incremental CPU and Memory Usage statistics added
+  to `RunInfo` after each sync from `process_monitor.keep_running` and
+  `process.is_running` calls.
+* Patch: Fixed extra newline printed before sudo request.
 
 10.0.0
 ------
