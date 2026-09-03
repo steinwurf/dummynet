@@ -34,6 +34,11 @@ Homepage = "https://github.com/steinwurf/dummynet"
 Repository = "https://github.com/steinwurf/dummynet"
 Issues = "https://github.com/steinwurf/dummynet/issues"
 
+[tool.pytest.ini_options]
+markers = [
+    "systemd: requires a Linux host with a running systemd system manager",
+]
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 
