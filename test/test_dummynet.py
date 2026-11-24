@@ -9,6 +9,7 @@ from dummynet import (
 
 import logging
 import signal
+import threading
 import time
 import os
 
@@ -487,6 +488,54 @@ def test_run_async_output(process_monitor: ProcessMonitor, shell: HostShell):
 
     out1.match(stdout="5 packets transmitted*", stderr=None)
     out2.match(stdout="3 packets transmitted*", stderr=None)
+
+
+def test_poll_does_not_block_on_whole_chunks(log: logging.Logger):
+    # A process writes output that fills whole 4096-byte chunks and then goes
+    # quiet without closing its stdout. Reading it must not block until the
+    # process writes again.
+    read_fd, write_fd = os.pipe()
+    received = []
+
+    poller = ProcessMonitor.Poller(log=log)
+    poller.add_fd(read_fd, received.append)
+
+    os.write(write_fd, b"x" * 8192)
+
+    thread = threading.Thread(target=poller.poll, kwargs={"timeout": 1000})
+    thread.start()
+    thread.join(timeout=2)
+    blocked = thread.is_alive()
+
+    # Closing the writer lets a blocked read return, so the thread ends.
+    os.close(write_fd)
+    thread.join()
+    os.close(read_fd)
+
+    assert not blocked, "poll() blocked reading output that was already there"
+    assert "".join(received) == "x" * 8192
+
+
+def test_poll_reads_everything_on_hangup(log: logging.Logger):
+    # When the process closes its stdout, all of the output left in the pipe
+    # must be read before the file descriptor is unregistered.
+    read_fd, write_fd = os.pipe()
+    received = []
+
+    poller = ProcessMonitor.Poller(log=log)
+    poller.read_size = 1024
+    poller.add_fd(read_fd, received.append)
+
+    try:
+        os.write(write_fd, b"x" * 4096)
+        os.close(write_fd)
+
+        poller.poll(timeout=1000)
+    finally:
+        os.close(read_fd)
+
+    assert "".join(received) == "x" * 4096
+    assert read_fd not in poller.callbacks
 
 
 def test_link_delete_cleanup(net: DummyNet):
