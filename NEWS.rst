@@ -5,7 +5,9 @@ every change, see the Git log.
 
 Latest
 ------
-* tbd
+* Patch: Fixed `ProcessMonitor` blocking forever when it read a process's
+  output and the output waiting was an exact multiple of 4096 bytes. It then
+  only returned once the process wrote again or exited.
 
 10.2.0
 ------

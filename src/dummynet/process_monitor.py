@@ -112,6 +112,10 @@ class ProcessMonitor:
     """
 
     class Poller:
+        # The most bytes one read takes from a file descriptor. This is the
+        # default pipe capacity on Linux, so one read usually empties a pipe.
+        read_size = 64 * 1024
+
         def __init__(self, log):
             self.poller = select.poll()
             self.callbacks = {}
@@ -133,13 +137,23 @@ class ProcessMonitor:
 
             self.log.debug(f"Poller: unregister process fd {fd}")
 
-        def read_fd(self, fd):
+        def read_fd(self, fd, until_eof=False):
+            """Read the output waiting on fd and pass it to its callback.
+
+            Without until_eof this reads once. The file descriptor is
+            blocking, so another read after the waiting output is gone only
+            returns once the process writes again or closes fd. poll() keeps
+            reporting POLLIN while output is waiting, so nothing is left
+            behind.
+
+            :param until_eof: Read until end of file. Only use this once every
+                writer has closed fd (POLLHUP); otherwise it blocks.
+            """
             data = b""
             while True:
-                chunk = os.read(fd, 4096)  # Read in chunks of 4096 bytes
+                chunk = os.read(fd, self.read_size)
                 data += chunk
-                if len(chunk) < 4096:
-                    # If we read less than 4096 bytes, we are done
+                if not until_eof or not chunk:
                     break
 
             if not data:
@@ -160,7 +174,11 @@ class ProcessMonitor:
             # First if we have any events, we need to read from the
             # file descriptors
             for fd, event in fds:
-                if event & select.POLLIN:
+                if event & select.POLLHUP:
+                    # The process has closed fd, so reading to the end cannot
+                    # block. Read all of it, since fd is unregistered below.
+                    self.read_fd(fd, until_eof=True)
+                elif event & select.POLLIN:
                     self.read_fd(fd)
 
             for fd, event in fds:
